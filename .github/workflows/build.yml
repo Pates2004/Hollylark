@@ -1,0 +1,32 @@
+name: Build and validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Build
+        run: dotnet build LarkControl.slnx --configuration Release --nologo
+      - name: Validate protocol, profiles and translations
+        run: dotnet run --project tests/Hollylark.Validation --configuration Release --no-build -- --core-only
+      - name: Validate single-instance coordination
+        run: dotnet run --project tests/Hollylark.Validation --configuration Release --no-build -- --single-instance-only
+      - name: Validate artifact paths and integrity guards
+        run: ./tests/Hollylark.Validation/ArtifactSafetyTests.ps1
+      - name: Publish framework-dependent Windows application
+        run: ./build.ps1

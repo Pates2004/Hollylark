@@ -1,0 +1,24 @@
+Hollylark - third-party information
+
+Hollylark itself is licensed under GPL-3.0-only. The full license is in
+LICENSE, included with the source code and portable package. Matching
+source releases: https://github.com/Pates2004/Hollylark/tags
+
+Hollylark uses HidSharp 2.6.4 by James F. Bellinger, distributed under
+the Apache License, Version 2.0. The original license is embedded as
+HidSharp.LICENSE.txt and available on the Help page.
+Project: https://github.com/IntergatedCircuits/HidSharp
+
+Hollylark uses NAudio.Wasapi 2.2.1 and NAudio.Core 2.2.1, distributed
+under the MIT License. The original license is embedded as NAudio.LICENSE.txt
+and available on the Help page.
+Project: https://github.com/naudio/NAudio
+
+This framework-dependent release requires Microsoft .NET Desktop Runtime 10
+(Windows x64). The .NET runtime is NOT bundled with this application.
+Its licenses are supplied with Microsoft's separately installed runtime.
+
+This is an independent implementation for interoperability with LARK A1.
+Hollyland, LARK and HollyAudio belong to their respective owners.
+No Hollyland APK, artwork, firmware or decompiled code is redistributed
+inside the application. No affiliation or manufacturer endorsement is implied.

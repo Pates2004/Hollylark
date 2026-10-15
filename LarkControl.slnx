@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/LarkControl.Core/LarkControl.Core.csproj" />
+  <Project Path="src/LarkControl.Windows/LarkControl.Windows.csproj" />
+  <Project Path="tests/Hollylark.Validation/Hollylark.Validation.csproj" />
+</Solution>

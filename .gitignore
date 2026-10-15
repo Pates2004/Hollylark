@@ -1,0 +1,11 @@
+/installfiles/
+/example/
+/AGENTS.md
+/.vs/
+/.idea/
+/src/*/bin/
+/src/*/obj/
+/tests/*/bin/
+/tests/*/obj/
+*.user
+*.suo

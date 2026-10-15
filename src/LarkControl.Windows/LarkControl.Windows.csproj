@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseAppHost>true</UseAppHost>
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+    <AssemblyName>Hollylark</AssemblyName>
+    <Product>Hollylark</Product>
+    <Title>Hollylark</Title>
+    <Version>0.9.1</Version>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="langs/*.lng" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" ExcludeFromSingleFile="true" />
+    <EmbeddedResource Include="langs/pl.lng" LogicalName="Hollylark.LanguageContract" />
+    <InternalsVisibleTo Include="Hollylark.Validation" />
+    <ProjectReference Include="../LarkControl.Core/LarkControl.Core.csproj" />
+    <PackageReference Include="HidSharp" Version="2.6.4" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <EmbeddedResource Include="$(NuGetPackageRoot)hidsharp/2.6.4/LICENSE.txt" LogicalName="HidSharp.LICENSE.txt" />
+    <EmbeddedResource Include="../../THIRD-PARTY-NOTICES.txt" LogicalName="Hollylark.NOTICES.txt" />
+    <EmbeddedResource Include="Resources/NAudio.LICENSE.txt" LogicalName="NAudio.LICENSE.txt" />
+  </ItemGroup>
+</Project>
