@@ -62,21 +62,32 @@ public partial class MainWindow : Window
 
     public MainWindow(Func<IReadOnlyList<ReceiverInfo>> discover, Func<ReceiverInfo, IA1Transport> factory,
         string? baseDirectory = null, IDesktopIntegration? desktop = null, Func<string, string, bool>? confirm = null,
-        Action<string>? announceState = null, Action<string>? reportDesktopError = null, bool automaticReceiverManagement = true)
+        Action<string>? announceState = null, Action<string>? reportDesktopError = null, bool automaticReceiverManagement = true,
+        IHotkeyNativeApi? hotkeyNativeApi = null)
     {
         ArgumentNullException.ThrowIfNull(discover);
         ArgumentNullException.ThrowIfNull(factory);
         this.discover = discover;
         this.factory = factory;
         this.automaticReceiverManagement = automaticReceiverManagement;
+        this.hotkeyNativeApi = hotkeyNativeApi;
         desktopIntegration = desktop ?? new DesktopIntegration();
         if (desktopIntegration is DesktopIntegration nativeDesktop) nativeDesktop.Failed += OnDesktopFailure;
-        confirmAction = confirm ?? ((message, title) => MessageBox.Show(GetDialogOwner(), message, title,
+        Func<string, string, bool> confirmDialog = confirm ?? ((message, title) => MessageBox.Show(GetDialogOwner(), message, title,
             MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes);
+        confirmAction = (message, title) =>
+        {
+            bool previous = shortcutDialogActive;
+            shortcutDialogActive = true;
+            try { return confirmDialog(message, title); }
+            finally { shortcutDialogActive = previous; }
+        };
         stateAnnouncement = announceState;
         desktopError = reportDesktopError ?? (message => MessageBox.Show(message, Localization.Text("Main.Tray.ErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error));
         preferencesStore = new UiPreferencesStore(baseDirectory);
         preferences = preferencesStore.Load(out preferencesError);
+        retentionStore = new DeviceSettingsRetentionStore(preferencesStore.BaseDirectory);
+        retention = new DeviceSettingsRetention(retentionStore);
         InitializeComponent();
         Localization.ApplyResources(Resources);
         Language = XmlLanguage.GetLanguage(Localization.Culture.IetfLanguageTag);
@@ -98,6 +109,7 @@ public partial class MainWindow : Window
         receiverTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromSeconds(1) };
         receiverTimer.Tick += async (_, _) => await RefreshUsbAsync();
         Loaded += OnLoaded;
+        SourceInitialized += InitializeGlobalHotkeys;
         PreviewKeyDown += (_, _) => focusInteraction++;
         PreviewMouseDown += (_, _) => focusInteraction++;
         Deactivated += (_, _) => focusInteraction++;
@@ -213,9 +225,11 @@ public partial class MainWindow : Window
             A1Status state = await ReadSnapshotAsync(session, expectedGeneration, token);
             if (!IsSession(session, expectedGeneration) || operation != expectedOperation) return;
             ClearReceiverFailure();
-            ShowState(state);
+            bool attemptedRestoration = await AcceptObservedStateAsync(state, session, expectedGeneration, token);
+            if (!IsSession(session, expectedGeneration) || operation != expectedOperation) return;
             pollTimer.Start();
-            SetResult(GetUsbConnectionText());
+            if (!attemptedRestoration && retention.LastError is null) SetResult(GetUsbConnectionText());
+            else if (retention.LastError is not null) SetResult(Localization.Text("Retention.StoreError", retentionStore.FilePath), true);
         }
         catch (Exception exception)
         {
@@ -259,7 +273,7 @@ public partial class MainWindow : Window
     public Task RefreshAsync() => !IsConnected && automaticReceiverManagement ? ScanAsync() : RunSessionOperationAsync(Localization.Text("Main.Refresh.Pending"),
         (session, expectedGeneration, token) => ReadSnapshotAsync(session, expectedGeneration, token),
         Localization.Text("Main.Refresh.Success"),
-        () => { foreach (SettingRowViewModel setting in AllSettings) setting.DiscardDraft(); });
+        () => { foreach (SettingRowViewModel setting in AllSettings) setting.DiscardDraft(); }, observeSettings: true);
 
     public Task ApplySettingAsync(SettingRowViewModel setting)
     {
@@ -304,7 +318,7 @@ public partial class MainWindow : Window
 
     private async Task RunSessionOperationAsync(string pending,
         Func<A1Controller, long, CancellationToken, Task<A1Status>> action, string success, Action? confirmed = null,
-        string? failureWarning = null)
+        string? failureWarning = null, bool observeSettings = false)
     {
         if (closed || busy || controller is null || currentStatus is null || sessionCancellation is null) return;
         var previousFocus = CaptureOperationFocus();
@@ -320,8 +334,18 @@ public partial class MainWindow : Window
             A1Status state = await action(session, expectedGeneration, token);
             if (!IsSession(session, expectedGeneration) || operation != expectedOperation) return;
             confirmed?.Invoke();
-            ShowState(state);
-            SetResult(success);
+            if (observeSettings)
+            {
+                ObserveReadOnlySettings(state);
+                ShowState(state, rememberSettings: false);
+            }
+            else
+            {
+                ShowState(state);
+            }
+            SetResult(retention.LastError is not null && preferences.PreserveVolatileSettings
+                ? success + " " + Localization.Text("Retention.StoreError", retentionStore.FilePath) : success,
+                retention.LastError is not null && preferences.PreserveVolatileSettings);
         }
         catch (MicrophoneScopeException exception)
         {
@@ -330,6 +354,15 @@ public partial class MainWindow : Window
                 DiscardControlTargetDrafts();
                 ShowState(exception.Status);
                 SetResult(ScopeFailureMessage(exception) + (failureWarning is null ? string.Empty : " " + failureWarning), true);
+            }
+        }
+        catch (DeviceStateChangedException exception)
+        {
+            if (IsSession(session, expectedGeneration) && operation == expectedOperation)
+            {
+                DiscardControlTargetDrafts();
+                ShowState(exception.Status);
+                SetResult(Localization.Text("Main.Change.Concurrent"), true);
             }
         }
         catch (DeviceWriteSafetyException exception)
@@ -369,7 +402,8 @@ public partial class MainWindow : Window
         try
         {
             A1Status state = await ReadSnapshotAsync(session, expectedGeneration, token);
-            if (IsSession(session, expectedGeneration) && operation == expectedOperation && !busy) ShowState(state);
+            if (IsSession(session, expectedGeneration) && operation == expectedOperation && !busy)
+                await AcceptObservedStateAsync(state, session, expectedGeneration, token);
         }
         catch (Exception exception)
         {
@@ -403,8 +437,14 @@ public partial class MainWindow : Window
         RestoreOperationFocus(previousFocus);
     }
 
-    private void EndSession()
+    private void EndSession(bool receiverRemoved = false)
     {
+        deferredRetention = null;
+        if (sessionReceiver is { } previousReceiver)
+        {
+            if (receiverRemoved) retention.MarkDisconnected(previousReceiver.Path);
+            else retention.ResetObservation(previousReceiver.Path);
+        }
         generation++;
         controlContextGeneration++;
         targetInitializedForSession = false;
@@ -456,10 +496,11 @@ public partial class MainWindow : Window
         if (!repeated) SetResult(Localization.Text("Main.Session.Closed", message), true);
     }
 
-    private void ShowState(A1Status state)
+    private void ShowState(A1Status state, bool rememberSettings = true)
     {
         A1Status? previous = currentStatus;
         currentStatus = state;
+        if (rememberSettings) RememberConfirmedSettings(state);
         lastConfirmedRead = DateTimeOffset.Now;
         foreach (int device in versions.Keys.Where(device => device > 0 &&
             (device > state.Transmitters.Count || !state.Transmitters[device - 1].Connected)).ToArray())
@@ -589,7 +630,7 @@ public partial class MainWindow : Window
                 foreach (var entry in fresh) identities.Add(entry.Key, entry.Value);
             }
             return state;
-        }, Localization.Text("Main.Identity.Success"));
+        }, Localization.Text("Main.Identity.Success"), observeSettings: true);
 
     private void SetResult(string message, bool important = false)
     {
@@ -648,7 +689,18 @@ public partial class MainWindow : Window
             applyProfile: ApplyAudioProfileAsync, confirm: confirmAction, refreshStatus: ReadProfileStatusAsync,
             canUseReceiver: () => IsConnected && !busy, receiverGeneration: () => controlContextGeneration);
         settingsWindow = window;
-        ShowSection(window, () => settingsWindow = null);
+        if (globalHotkeys is not null)
+        {
+            HotkeyOperationResult result = globalHotkeys.IsSuspended
+                ? globalHotkeys.Configure(preferences.GlobalHotkeysEnabled, preferences.Hotkeys) : globalHotkeys.Suspend();
+            window.SetHotkeyCaptureAvailable(result.Succeeded && globalHotkeys.ActiveBindings.Count == 0);
+            if (!result.Succeeded)
+            {
+                hotkeyConfigurationValid = false;
+                ReportHotkeyFailure(result);
+            }
+        }
+        ShowSection(window, () => { settingsWindow = null; ResumeApplicationHotkeys(); });
         return window;
     }
 
@@ -699,7 +751,8 @@ public partial class MainWindow : Window
         if (!IsConnected || busy) return null;
         A1Controller originalSession = controller!;
         long expectedGeneration = generation;
-        Task pendingRead = RunSessionOperationAsync(Localization.Text("Main.Profile.ReadPending"), ReadSnapshotAsync, Localization.Text("Main.Profile.ReadSuccess"));
+        Task pendingRead = RunSessionOperationAsync(Localization.Text("Main.Profile.ReadPending"), ReadSnapshotAsync,
+            Localization.Text("Main.Profile.ReadSuccess"), observeSettings: true);
         long expectedOperation = operation;
         await pendingRead;
         return IsSession(originalSession, expectedGeneration) && operation == expectedOperation && IsConnected ? currentStatus : null;
@@ -783,6 +836,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs eventArgs)
     {
         closed = true;
+        globalHotkeys?.Dispose();
         receiverTimer.Stop();
         EndSession();
         try { desktopIntegration.Dispose(); }

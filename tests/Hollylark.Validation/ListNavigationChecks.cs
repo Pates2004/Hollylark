@@ -131,6 +131,7 @@ internal static partial class Program
                 AudioProfile profile => profile.Name,
                 ReceiverInfo receiver => receiver.Name,
                 TransmitterViewModel target => target.Summary,
+                ListBoxItem { Content: string caption } => caption,
                 _ => throw new InvalidOperationException("Unexpected navigation fixture item")
             };
             Check(list.SelectedIndex == index, "List arrow synchronizes its selection: " + expected);

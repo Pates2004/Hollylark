@@ -4,11 +4,13 @@
 
 An unofficial Windows application for controlling a **Hollyland LARK A1 USB-C** receiver. Hollylark provides native WPF controls, keyboard navigation and accessible labels for NVDA. It is independent of Hollyland and is not endorsed by the manufacturer.
 
-**Version 0.9.1** · Windows x64 · .NET Desktop Runtime 10 x64
+**Source version 0.10.0** · Windows x64 · .NET Desktop Runtime 10 x64
 
 ## Download and launch
 
-1. Download the portable ZIP from the [latest GitHub release](https://github.com/Pates2004/Hollylark/releases/latest). The first public release is **v0.9.1**.
+The latest published portable package is **v0.9.1**. This guide describes the **0.10.0 source on `main`**; [build from source](#build) to use the new global shortcuts and volatile-setting preservation before a matching package is released.
+
+1. Download the portable ZIP from the [latest GitHub release](https://github.com/Pates2004/Hollylark/releases/latest).
 2. Install **Microsoft .NET Desktop Runtime 10 for Windows x64** separately. Hollylark is framework-dependent: it does not bundle .NET. Its native Windows GUI host offers the standard .NET download prompt when the required runtime is missing.
 3. Extract the entire ZIP into a writable folder. Keep these files together; do not run the EXE inside the ZIP:
 
@@ -35,10 +37,13 @@ Hollylark allows one running instance per Windows user/session. Launching it aga
 - Light/dark appearance, adjustable text and readout presentation, and optional visual/screen-reader hints remembered between launches.
 - Optional Windows input meters with RMS, sample peaks and retained clipping indications. Select an input and start measurement explicitly; Hollylark does not automatically capture audio, save recordings or send audio over the network.
 - Local diagnostics, with serial/MAC identity reads available on request.
+- Editable global shortcuts with keyboard capture, enable/disable and default restoration.
+- Optional background screen-reader notifications for confirmed external device changes.
+- Default-on preservation of volatile shared parameters after an observed microphone reconnection.
 
 ## Receivers and microphone controls
 
-Connect the **USB-C receiver** using a data-capable cable or adapter and turn on the transmitters. The charging case is not a receiver. The sole detected receiver is selected and read automatically; if several are present, select one with the arrow keys in the receiver list. Discovery and automatic status reads do not apply profiles or write audio settings.
+Connect the **USB-C receiver** using a data-capable cable or adapter and turn on the transmitters. The charging case is not a receiver. The sole detected receiver is selected and read automatically; if several are present, select one with the arrow keys in the receiver list. Startup discovery and an initial snapshot of already active microphones do not apply profiles or write settings. Enabled volatile-setting preservation can restore parameters after an observed reconnection, as described below.
 
 Use the microphone list to choose an individual microphone or **All microphones**. The UI supports indices 1–4 when the receiver reports the corresponding topology; this does not convert two-transmitter firmware into four-transmitter firmware.
 
@@ -52,6 +57,16 @@ Gain, noise reduction, EQ, reverb and other device parameters are **shared recei
 By default, choosing a value creates a draft; press **Apply** to send it. Automatic application is an optional setting, disabled by default. Changes require an acknowledgement and matching device readback. Changing the receiver, selected microphone/group or active microphone membership discards unsent drafts and queued automatic changes. **F5** also discards drafts before reading again.
 
 Group mute/unmute sends commands sequentially to the active microphone indices, checks acknowledgements and requires a final readback confirming the whole group. A mixed group is muted; a fully muted group is unmuted. This is not an atomic operation: a failure, disconnection or cancellation can leave some microphones changed. A partial-operation warning means you should read the current state again; it does not mean earlier writes were rolled back.
+
+## Global shortcuts and automatic restoration
+
+Open **Settings → Keyboard shortcuts**, select an action with the arrow keys, then Tab to its editable shortcut field and **Capture shortcut** button. Capture listens only after pressing that button; Escape cancels capture without closing Settings. Clear the field to unassign an action. Invalid, duplicate or occupied combinations are reported before saving.
+
+Global shortcuts are **disabled by default**. Enabling/disabling keeps the assignments; resetting this category restores its defaults and disables it again. Defaults use Ctrl+Alt+Shift: F1 shows Hollylark, F5 reads status, F2 toggles the selected microphone/group, F3 toggles all microphones, Up/Down change gain, F6 cycles noise reduction, F7 cycles EQ, F8 cycles reverb, F9 toggles LEDs and F10 changes mono/stereo. Auto-off and identification actions start unassigned. Defaults avoid letter keys so they do not consume AltGr text entry. Hardware actions use fresh status and the existing individual/group restrictions without moving focus. A global read refuses when unsent drafts exist; ordinary F5 still explicitly discards drafts. Registrations are suspended while Settings is open and released on exit. Hollylark must remain running for global shortcuts to work.
+
+The existing **Announce device state changes through the screen reader** option now also sends background UI Automation notifications for confirmed changes made through a phone or microphone buttons. It does not move focus, repeat unchanged values or announce battery fluctuations. Screen-reader settings determine how notifications are presented; actual NVDA speech is not certified by automated tests.
+
+**Preserve volatile microphone settings** is enabled by default. Confirmed gain, channels, noise reduction, EQ, reverb, LEDs, auto-off and supported identification settings are remembered per receiver USB path in `data/retained-settings.json`, beside the EXE. Continuous-session external changes become the new baseline. After a detected disconnection/reconnection, differing shared parameters are restored with fresh group checks, conflict detection and readback. This affects the whole active group, regardless of the displayed individual target. Mute is never restored and microphones are never automatically unmuted. If the first device snapshot already has active microphones, their actual state is adopted without writing an old configuration; if startup first observes them disconnected, remembered settings can be restored when they return. A different USB path gets its own baseline. Power cycles entirely between polls or while Hollylark is closed cannot be identified reliably; the protocol does not report why a value changed. Failures or concurrent changes stop the attempt without repeated write loops. Unavailable noise/identification changes are not forced by unmuting or bypassing microphone-count gates. Unsent drafts or open Settings prevent a new restoration attempt. F5 and explicit identity reads remain read-only; a deferred reconnect restoration can occur on a later background poll. Disable preservation to prevent these automatic writes.
 
 ## Keyboard and NVDA
 
@@ -97,11 +112,11 @@ Use Windows x64, the **.NET 10 SDK** and PowerShell. From the checkout root:
 
 The script publishes the current framework-dependent x64 release into local `installfiles`, keeping `Hollylark.exe` with its `langs` folder and preserving existing `data` and `reports`. It retains the native GUI host and does not use self-contained publication or Native AOT.
 
-Build artifacts go to `D:\work\Workspace\<checkout-directory-name>`; previous builds/releases are moved into `D:\work\Snapshots\<checkout-directory-name>`. Only when drive D: does not exist is the equivalent `C:\work` layout used. An unwritable or full D: does not trigger a switch to C:.
+Build artifacts go to `D:\work\Workspace\<checkout-directory-name>`. Superseded builds/releases go to `D:\work\Trash\<checkout-directory-name>` without deletion; retain a previous build in `Snapshots` only for a documented current diagnostic or recovery dependency. Only when drive D: does not exist is the equivalent `C:\work` layout used. An unwritable or full D: does not trigger a switch to C:.
 
 ## Validation
 
-Version 0.9.1 passed 34,663 checks in the full isolated Windows regression suite. Separate runs passed 24 process-coordination checks and 12 WPF window-restoration checks. These sets overlap. Actual NVDA speech and physical microphone effects require hardware/user testing.
+Version 0.10.0 passed 36,015 checks in the full isolated Windows regression suite, including simulated reconnect restoration, shortcut transactions and external UI Automation action-list focus/selection checks in Polish and English. Separate runs passed 10 real Win32 hotkey-registration checks and 12 WPF window-restoration checks; native Explorer tray checks also passed. These sets overlap and do not certify physical keyboard-triggered cross-application dispatch, actual NVDA speech or physical microphone effects, which still require user/hardware testing.
 
 Run the console checks with:
 

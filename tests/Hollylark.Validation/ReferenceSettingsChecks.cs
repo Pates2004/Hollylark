@@ -23,7 +23,7 @@ internal static partial class Program
             ["GainControlModeChoice"] = ["Lista wyboru", "Przyciski", "Suwak"],
             ["ValueDisplayModeChoice"] = ["Pola tylko do odczytu", "Zwykły tekst", "Bez dodatkowych wartości"]
         };
-        string[] categoryNames = ["Wygląd", "Ekran główny", "Sterowanie", "Uruchamianie i zamykanie", "Profile audio"];
+        string[] categoryNames = ["Wygląd", "Ekran główny", "Sterowanie", "Uruchamianie i zamykanie", "Profile audio", "Skróty klawiszowe"];
         foreach (string theme in new[] { "Light", "Dark" })
         foreach (int scale in new[] { 100, 200 })
         {
@@ -48,7 +48,7 @@ internal static partial class Program
                 window.Show();
                 Pump();
                 var tabs = (TabControl)window.FindName("SettingsTabs");
-                Check(tabs.Items.Count == categoryNames.Length, "Reference settings retain all five LARK categories");
+                Check(tabs.Items.Count == categoryNames.Length, "Reference settings retain existing categories and append keyboard shortcuts");
                 VerifyReferenceSettingsGeometry(window);
                 for (int categoryIndex = 0; categoryIndex < tabs.Items.Count; categoryIndex++)
                 {

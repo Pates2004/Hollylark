@@ -663,11 +663,11 @@ try {
     if ($null -ne $restartNotice -and -not $restartNotice.Current.IsOffscreen) {
         throw 'An unchanged language must not add a redundant restart instruction to Settings.'
     }
-    $categories = @('AppearanceSettingsTab', 'MainScreenSettingsTab', 'ControlsSettingsTab', 'StartupAndClosingSettingsTab', 'ProfilesSettingsTab')
+    $categories = @('AppearanceSettingsTab', 'MainScreenSettingsTab', 'ControlsSettingsTab', 'StartupAndClosingSettingsTab', 'ProfilesSettingsTab', 'HotkeysSettingsTab')
     $categoryCaptionKeys = @{
         AppearanceSettingsTab = 'Settings.Appearance.Name'; MainScreenSettingsTab = 'Settings.MainScreen.Name'
         ControlsSettingsTab = 'Settings.Controls.Name'; StartupAndClosingSettingsTab = 'Settings.StartupAndClosing.Name'
-        ProfilesSettingsTab = 'Settings.Profiles.Name'
+        ProfilesSettingsTab = 'Settings.Profiles.Name'; HotkeysSettingsTab = 'Hotkeys.Tab.Name'
     }
     foreach ($identifier in $categories) {
         $category = $settingsWindow.FindFirst([Windows.Automation.TreeScope]::Descendants,
@@ -697,7 +697,50 @@ try {
                 [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty, 'AutoApplySelectionsWarning'))
             if ($null -ne $autoApplyWarning) { throw 'Automatic-apply instructions must not remain in Settings.' }
         }
+        if ($identifier -eq 'HotkeysSettingsTab') {
+            $actions = Get-ReleaseElement -Root $settingsWindow -Identifier 'HotkeyActionsList'
+            $items = $actions.FindAll([Windows.Automation.TreeScope]::Descendants,
+                [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::ListItem))
+            $actionNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            foreach ($item in $items) { [void]$actionNames.Add($item.Current.Name) }
+            $scroll = $actions.GetCurrentPattern([Windows.Automation.ScrollPattern]::Pattern)
+            $initialScroll = $scroll.Current.VerticalScrollPercent
+            try {
+                if ($scroll.Current.VerticallyScrollable) {
+                    $scroll.SetScrollPercent([Windows.Automation.ScrollPattern]::NoScroll, 100)
+                    $deadline = [DateTime]::UtcNow.AddSeconds(3)
+                    do {
+                        $items = $actions.FindAll([Windows.Automation.TreeScope]::Descendants,
+                            [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::ListItem))
+                        foreach ($item in $items) { [void]$actionNames.Add($item.Current.Name) }
+                        if ($actionNames.Count -lt 13) { Start-Sleep -Milliseconds 30 }
+                    } while ($actionNames.Count -lt 13 -and [DateTime]::UtcNow -lt $deadline)
+                }
+            }
+            finally {
+                if ($initialScroll -ge 0) { $scroll.SetScrollPercent([Windows.Automation.ScrollPattern]::NoScroll, $initialScroll) }
+            }
+            if ($actionNames.Count -ne 13 -or @($actionNames | Where-Object { [string]::IsNullOrWhiteSpace($_) -or $_ -like '*LarkControl.*' }).Count) {
+                throw "Published virtualized shortcut list must expose thirteen named actions through scrolling. Found $($actionNames.Count): $($actionNames -join '; ')"
+            }
+            $shortcut = Get-ReleaseElement -Root $settingsWindow -Identifier 'HotkeyGestureTextBox'
+            if ($shortcut.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.IsReadOnly) {
+                throw 'The published shortcut field must be editable.'
+            }
+            [void](Get-ReleaseElement -Root $settingsWindow -Identifier 'CaptureHotkeyButton')
+            $master = Get-ReleaseElement -Root $settingsWindow -Identifier 'EnableGlobalHotkeysCheckBox'
+            $shortcutSettings = [ordered]@{
+                ActionNames = @($actionNames)
+                ActionCount = $actionNames.Count
+                EditableShortcut = $true
+                CaptureButtonPresent = $true
+                Enabled = $master.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState.ToString()
+            }
+        }
     }
+    $profilesCategory = Get-ReleaseElement -Root $settingsWindow -Identifier 'ProfilesSettingsTab'
+    $profilesCategory.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    Assert-ReleaseInformationalEdits -Root $settingsWindow
     $profileUsbState = Get-ReleaseUsbReadState -Root $automation
     if ($cancelOperation.Current.IsEnabled -or $profileUsbState.State -eq 'Reading') {
         throw 'USB state is changing during profile guard inspection. Retry after it settles; no hardware changes were made.'
@@ -863,6 +906,7 @@ try {
         AutomationId = $automation.Current.AutomationId
         SettingsWrittenDuringSetup = $setupCompleted
         SettingsCategories = $categories
+        GlobalShortcutControls = $shortcutSettings
         Limitations = 'Release host, selected-language captions, persisted language after restart, external language catalog hashes, setup-before-main order, one native USB selector and active readout, settings categories, profile gates against actual USB read state, read-only diagnostic command trace, native audio endpoint enumeration without capture, firmware guide, single-page help and normal exit checked with UI Automation. Automatic real USB status/version reads are allowed when a receiver is available; no receiver selection, manual connection, hardware-setting writes, identity-read invocation, registry writes or global input injection are performed. Actual NVDA listening, physical audio, deliberate hotplug, multi-receiver switching and keyboard/tray interaction remain manual.'
     }
     $report['ExitConfirmation'] = Close-ReleaseMain -OwnedProcess $process -WindowHandle $window -RequireConfirmation $confirmExit -RejectOnce

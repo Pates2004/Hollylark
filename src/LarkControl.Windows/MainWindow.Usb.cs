@@ -54,7 +54,9 @@ public partial class MainWindow
             bool listHadFocus = ReceiverList.IsKeyboardFocusWithin;
             var previousFocus = CaptureOperationFocus();
             bool sessionRemoved = sessionReceiver is not null && !snapshot.Any(receiver => SameReceiver(receiver.Path, sessionReceiver.Path));
-            if (sessionRemoved) EndSession();
+            foreach (ReceiverInfo removed in Receivers.Where(receiver => !snapshot.Any(found => SameReceiver(found.Path, receiver.Path))))
+                retention.MarkDisconnected(removed.Path);
+            if (sessionRemoved) EndSession(receiverRemoved: true);
             if (failedReceiverPath is not null && !snapshot.Any(receiver => SameReceiver(receiver.Path, failedReceiverPath))) ClearReceiverFailure();
             bool changed = ReconcileReceiverList(snapshot, selectedPath);
             if (changed || hadFailure || sessionRemoved) UpdateView();

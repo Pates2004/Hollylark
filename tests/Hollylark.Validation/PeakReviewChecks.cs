@@ -89,9 +89,11 @@ internal static partial class Program
                 return previousOperation.IsCompleted;
             });
             previousOperation.GetAwaiter().GetResult();
-            Check(!Directory.Exists(directory)
+            Check(!File.Exists(Path.Combine(directory, "data", "settings.json"))
+                && Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
+                    .All(path => path == Path.Combine(directory, "data", "retained-settings.json"))
                 && transport.Inner.Commands.All(command => command is A1Command.GetStatus or A1Command.GetVersion or A1Command.SetGain),
-                "Peak review writes no preference files and sends only the intended commands to its fake transport");
+                "Peak review writes only default-on retention data, never preferences, and sends only intended fake-device commands");
 
             if (applyProfile)
             {

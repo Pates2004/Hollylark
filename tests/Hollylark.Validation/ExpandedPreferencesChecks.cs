@@ -9,8 +9,8 @@ internal static partial class Program
     {
         var defaults = new UiPreferences();
         defaults.Validate();
-        Check(defaults.SchemaVersion == 3 && defaults.Language == "pl" && defaults.Theme == "Light" && defaults.TextScale == 100,
-            "Expanded preferences use schema three and system appearance");
+        Check(defaults.SchemaVersion == UiPreferences.CurrentSchemaVersion && defaults.Language == "pl" && defaults.Theme == "Light" && defaults.TextScale == 100,
+            "Expanded preferences use the current schema and light appearance");
         Check(defaults.GainControlMode == GainControlMode.Choice && defaults.ValueDisplayMode == ValueDisplayMode.StaticText
             && defaults.ShowHints && defaults.ShowOperationMessages && defaults.AnnounceStateChanges,
             "Expanded control defaults use native choices and non-editable static readouts");
@@ -63,7 +63,7 @@ internal static partial class Program
 
         UiPreferences[] invalidPreferences =
         [
-            defaults with { SchemaVersion = 1 }, defaults with { SchemaVersion = 4 },
+            defaults with { SchemaVersion = 1 }, defaults with { SchemaVersion = UiPreferences.CurrentSchemaVersion + 1 },
             defaults with { Language = "de" }, defaults with { Language = "" }, defaults with { Language = null! },
             defaults with { Theme = null! }, defaults with { Theme = "dark" }, defaults with { Theme = "Unknown" },
             defaults with { Theme = "System" },
@@ -120,9 +120,9 @@ internal static partial class Program
                 $"Legacy migration {index} makes no implicit disk write");
             Check(store.TrySave(migrated, out error) && error is null, $"Legacy migration {index} can be explicitly saved");
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(store.FilePath));
-            Check(document.RootElement.GetProperty("SchemaVersion").GetInt32() == 3
+            Check(document.RootElement.GetProperty("SchemaVersion").GetInt32() == UiPreferences.CurrentSchemaVersion
                 && EquivalentExpandedPreferences(migrated, new UiPreferencesStore(store.BaseDirectory).Load(out error)) && error is null,
-                $"Legacy migration {index} persists schema two only after save");
+                $"Legacy migration {index} persists the current schema only after save");
         }
         var missingStore = new UiPreferencesStore(Path.Combine(ReportDirectory, "expanded-preferences", "missing"));
         Check(EquivalentExpandedPreferences(missingStore.Load(out string? missingError), new UiPreferences())
@@ -189,7 +189,7 @@ internal static partial class Program
         string profileJson = JsonSerializer.Serialize(AudioProfile.FromStatus("Valid", A1Status.Parse(ValidStatus)));
         var documents = new List<string>
         {
-            "null", "[]", "{broken", "{\"SchemaVersion\":4}", "{\"SchemaVersion\":-1}", "{\"SchemaVersion\":\"2\"}",
+            "null", "[]", "{broken", "{\"SchemaVersion\":99}", "{\"SchemaVersion\":-1}", "{\"SchemaVersion\":\"2\"}",
             "{\"SchemaVersion\":null}", "{\"SchemaVersion\":1,\"Theme\":\"Dark\"}",
             "{\"SchemaVersion\":2,\"Unknown\":42}", "{\"SchemaVersion\":2,\"Theme\":\"Future\"}",
             "{\"SchemaVersion\":2,\"SchemaVersion\":2}", "{\"SchemaVersion\":2,\"Theme\":\"Dark\",\"Theme\":\"Light\"}",
@@ -237,6 +237,7 @@ internal static partial class Program
 
     private static bool EquivalentExpandedPreferences(UiPreferences first, UiPreferences second) =>
         first.HiddenRows.SequenceEqual(second.HiddenRows) && first.AudioProfiles.SequenceEqual(second.AudioProfiles)
-        && first with { HiddenRows = Array.Empty<string>(), AudioProfiles = Array.Empty<AudioProfile>() }
-            == second with { HiddenRows = Array.Empty<string>(), AudioProfiles = Array.Empty<AudioProfile>() };
+        && first.Hotkeys.SequenceEqual(second.Hotkeys)
+        && first with { HiddenRows = Array.Empty<string>(), AudioProfiles = Array.Empty<AudioProfile>(), Hotkeys = Array.Empty<HotkeyBinding>() }
+            == second with { HiddenRows = Array.Empty<string>(), AudioProfiles = Array.Empty<AudioProfile>(), Hotkeys = Array.Empty<HotkeyBinding>() };
 }

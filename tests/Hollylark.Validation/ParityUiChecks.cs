@@ -87,6 +87,10 @@ internal static partial class Program
             Check(UiNotificationRouting.SelectTarget(main, sections, _ => false) is null,
                 "No active application window means no unsolicited background announcement");
             Check(UiNotificationRouting.SelectTarget(main, sections) is null, "Unshown windows are not notification targets");
+            Check(ReferenceEquals(UiNotificationRouting.SelectStateTarget(main, sections, _ => false), main),
+                "Opt-in device-state notifications retain a background provider without activating a window");
+            Check(ReferenceEquals(UiNotificationRouting.SelectStateTarget(main, sections, window => ReferenceEquals(window, help)), help),
+                "Device-state notifications prefer the active auxiliary provider when available");
         }
         finally
         {

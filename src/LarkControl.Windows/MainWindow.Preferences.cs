@@ -79,6 +79,8 @@ public partial class MainWindow
         try
         {
             candidate.Validate();
+            string? hotkeyError = ConfigureApplicationHotkeys(candidate);
+            if (hotkeyError is not null) throw new InvalidOperationException(hotkeyError);
             if (updateStartup)
             {
                 previousStartup = desktopIntegration.CaptureStartup();
@@ -101,7 +103,13 @@ public partial class MainWindow
                 pendingAutomaticChanges.Clear();
                 autoApplyTimer.Stop();
             }
+            bool retentionChanged = candidate.PreserveVolatileSettings != preferences.PreserveVolatileSettings;
             preferences = candidate;
+            hotkeyConfigurationValid = true;
+            if (retentionChanged)
+            {
+                retention.ResetObservations();
+            }
             committed = true;
             ApplyViewPreferences();
             if (error is not null) Log(error);
@@ -110,8 +118,17 @@ public partial class MainWindow
         catch (Exception exception)
         {
             if (committed)
+            {
+                if (settingsWindow is not null && globalHotkeys is not null && !globalHotkeys.IsSuspended)
+                {
+                    HotkeyOperationResult suspended = globalHotkeys.Suspend();
+                    settingsWindow.SetHotkeyCaptureAvailable(suspended.Succeeded);
+                    if (!suspended.Succeeded) hotkeyConfigurationValid = false;
+                }
                 return Localization.Text("Main.Preferences.RefreshFailed", exception.Message);
+            }
             string error = Localization.Text("Main.Preferences.ApplyFailed", exception.Message);
+            error += RestoreApplicationHotkeys();
             if (previousStartup is not null)
             {
                 try { desktopIntegration.RestoreStartup(previousStartup); }
@@ -317,13 +334,18 @@ public partial class MainWindow
         }
         if (changes.Count == 0) return;
         string message = string.Join(". ", changes);
+        AnnounceBackgroundNotification(message, "Hollylark.State");
+    }
+
+    private void AnnounceBackgroundNotification(string message, string activity)
+    {
+        if (closed) return;
         if (stateAnnouncement is not null) { stateAnnouncement(message); return; }
-        Window? target = UiNotificationRouting.SelectTarget(this, OwnedWindows.OfType<AuxiliaryWindow>());
-        if (target is null) return;
+        Window target = UiNotificationRouting.SelectStateTarget(this, OwnedWindows.OfType<AuxiliaryWindow>());
         try
         {
             AutomationPeer? peer = UIElementAutomationPeer.FromElement(target) ?? UIElementAutomationPeer.CreatePeerForElement(target);
-            peer?.RaiseNotificationEvent(AutomationNotificationKind.Other, AutomationNotificationProcessing.MostRecent, message, "Hollylark.State");
+            peer?.RaiseNotificationEvent(AutomationNotificationKind.Other, AutomationNotificationProcessing.MostRecent, message, activity);
         }
         catch (Exception exception) when (exception is InvalidOperationException or ElementNotAvailableException or COMException)
         {

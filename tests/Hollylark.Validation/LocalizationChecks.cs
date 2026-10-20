@@ -64,8 +64,8 @@ internal static partial class Program
         string contents = document.ToJsonString();
         File.WriteAllText(store.FilePath, contents, new UTF8Encoding(false));
         UiPreferences migrated = store.Load(out string? error);
-        Check(error is null && migrated.SchemaVersion == 3 && migrated.Language == "pl" && migrated.FirstRunCompleted,
-            "Schema2 migrates to Polish schema3 without reopening completed setup");
+        Check(error is null && migrated.SchemaVersion == UiPreferences.CurrentSchemaVersion && migrated.Language == "pl" && migrated.FirstRunCompleted,
+            "Schema2 migrates to the current Polish schema without reopening completed setup");
         Check(migrated.PreferredReceiverPath == legacy.PreferredReceiverPath && migrated.TextScale == 137 && migrated.Theme == "Dark"
             && migrated.HiddenRows.SequenceEqual(legacy.HiddenRows) && migrated.AudioProfiles.SequenceEqual(legacy.AudioProfiles) && !migrated.ShowHints,
             "Language migration preserves receiver, profiles, appearance and accessibility choices");

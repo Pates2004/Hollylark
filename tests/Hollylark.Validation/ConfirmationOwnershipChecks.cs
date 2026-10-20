@@ -51,9 +51,12 @@ internal static partial class Program
     private static void VerifyConfirmationOwnershipSourceContract()
     {
         string constructor = ReadConfirmationOwnershipSource("MainWindow.xaml.cs");
-        Check(constructor.Contains("confirmAction=confirm??((message,title)=>MessageBox.Show(GetDialogOwner(),message,title,",
+        Check(constructor.Contains("Func<string,string,bool>confirmDialog=confirm??((message,title)=>MessageBox.Show(GetDialogOwner(),message,title,",
                 StringComparison.Ordinal),
             "Source contract: injected confirmations take precedence and the default delegate resolves its owner at invocation");
+        Check(constructor.Contains("confirmAction=(message,title)=>", StringComparison.Ordinal)
+            && constructor.Contains("shortcutDialogActive=true;try{returnconfirmDialog(message,title);}finally{shortcutDialogActive=previous;}", StringComparison.Ordinal),
+            "Source contract: modal confirmations suspend shortcut dispatch and restore the previous guard even after an exception");
         Check(constructor.Contains("MessageBox.Show(GetDialogOwner(),message,title,MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes);",
                 StringComparison.Ordinal),
             "Source contract: native confirmation retains Yes/No, Question, default No and success only for Yes");
@@ -127,10 +130,12 @@ internal static partial class Program
         using var transport = new FakeTransport();
         var desktop = new MemoryDesktop();
         bool consent = false;
+        bool shortcutGuardObserved = false;
         MainWindow? callbackOwner = null;
         var prompts = new List<(string Message, string Title, Window? Owner, bool SettingsActive)>();
         Func<string, string, bool> confirm = (message, title) =>
         {
+            shortcutGuardObserved = callbackOwner is not null && ReadConfirmationOwnershipField<bool>(callbackOwner, "shortcutDialogActive");
             prompts.Add((message, title, callbackOwner?.GetDialogOwner(),
                 callbackOwner?.OwnedWindows.OfType<SettingsWindow>().Any(window => window.IsActive) == true));
             return consent;
@@ -139,14 +144,17 @@ internal static partial class Program
         callbackOwner = owner;
         try
         {
-            Check(ReferenceEquals(ReadConfirmationOwnershipField<Func<string, string, bool>>(owner, "confirmAction"), confirm),
-                "MainWindow preserves the exact injected confirmation delegate: " + scenario);
+            Func<string, string, bool> guardedConfirm = ReadConfirmationOwnershipField<Func<string, string, bool>>(owner, "confirmAction");
+            Check(!guardedConfirm("Guard probe", "Guard probe") && prompts.Count == 1 && shortcutGuardObserved
+                && !ReadConfirmationOwnershipField<bool>(owner, "shortcutDialogActive"),
+                "MainWindow calls the injected confirmation under a temporary shortcut guard and preserves its No response: " + scenario);
+            prompts.Clear();
             RunTask(owner.ConnectAsync());
             string committedBefore = JsonSerializer.Serialize(owner.CurrentPreferences);
             SettingsWindow settings = OpenTransactionSettings(owner);
             Check(ReferenceEquals(settings.Owner, owner)
-                && ReferenceEquals(ReadConfirmationOwnershipField<Func<string, string, bool>>(settings, "confirm"), confirm),
-                "Actual MainWindow Settings action preserves both ownership and the injected delegate: " + scenario);
+                && ReferenceEquals(ReadConfirmationOwnershipField<Func<string, string, bool>>(settings, "confirm"), guardedConfirm),
+                "Actual MainWindow Settings action preserves ownership and the guarded injected delegate: " + scenario);
             SetChoice(settings, "SettingsThemeChoice", "Dark");
             SetChoice(settings, "SettingsTextScaleChoice", 150);
             SelectSettingsCategory(settings, "ProfilesSettingsTab");
@@ -257,7 +265,7 @@ internal static partial class Program
         finally { consent = true; owner.RequestExit(); Pump(); }
     }
 
-    private static TValue ReadConfirmationOwnershipField<TValue>(object target, string name) where TValue : class =>
-        target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(target) as TValue
-        ?? throw new InvalidOperationException("Confirmation fixture field is missing or has an unexpected type: " + name);
+    private static TValue ReadConfirmationOwnershipField<TValue>(object target, string name) =>
+        target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(target) is TValue value
+            ? value : throw new InvalidOperationException("Confirmation fixture field is missing or has an unexpected type: " + name);
 }

@@ -129,6 +129,7 @@ internal static partial class Program
         VerifyMainAccessibilityRevisionChecks();
         VerifyMicrophoneTargetInterfaceChecks();
         VerifyProfileMicrophoneTargetChecks();
+        VerifyAutomatedControlInterface();
         if (!skipNativeMenuSmoke) VerifySingleInstanceActivationChecks();
         else Console.WriteLine("SKIP: Window restoration/focus requires the interactive desktop; run --single-instance-ui-only separately.");
         application.Shutdown();
@@ -328,9 +329,9 @@ internal static partial class Program
             Check(peer is not null && !string.IsNullOrWhiteSpace(peer.GetName()), "UIA accessible name: " + AutomationProperties.GetAutomationId(control));
             if (control is TextBox textBox)
             {
-                if (window is SettingsWindow && AutomationProperties.GetAutomationId(textBox) == "AudioProfileNameTextBox")
+                if (window is SettingsWindow && AutomationProperties.GetAutomationId(textBox) is "AudioProfileNameTextBox" or "HotkeyGestureTextBox")
                     Check(!textBox.IsReadOnly && textBox.IsTabStop && !string.IsNullOrWhiteSpace(AutomationProperties.GetName(textBox)),
-                        "Profile name input is explicitly named, editable and reachable by Tab");
+                        "Profile name and shortcut inputs are explicitly named, editable and reachable by Tab");
                 else if (window is MainWindow main)
                 {
                     string identifier = AutomationProperties.GetAutomationId(textBox);

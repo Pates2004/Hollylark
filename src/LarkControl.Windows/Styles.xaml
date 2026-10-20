@@ -28,6 +28,9 @@
         </Setter>
     </Style>
     <Style x:Key="WrappingReadoutLabelStyle" TargetType="Label" BasedOn="{StaticResource {x:Type Label}}" />
+    <DataTemplate x:Key="HotkeyActionTextTemplate">
+        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+    </DataTemplate>
     <Style x:Key="DeviceListStyle" TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
         <Setter Property="IsTabStop" Value="False" />
         <Setter Property="KeyboardNavigation.TabNavigation" Value="Once" />

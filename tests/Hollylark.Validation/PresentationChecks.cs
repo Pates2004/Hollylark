@@ -168,7 +168,7 @@ internal static partial class Program
             SettingsWindow settings = window.OwnedWindows.OfType<SettingsWindow>().Single();
             MoveOffscreen(settings);
             TabControl tabs = (TabControl)settings.FindName("SettingsTabs");
-            Check(tabs.Items.Count == 5, "All five reference-inspired settings categories exist");
+            Check(tabs.Items.Count == 6, "Reference-inspired settings categories include configurable keyboard shortcuts");
             for (int index = 0; index < tabs.Items.Count; index++)
             {
                 tabs.SelectedIndex = index;

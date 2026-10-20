@@ -37,7 +37,7 @@ To publish a local portable build:
 .\build.ps1
 ```
 
-Current release files belong in local `installfiles`. Working artifacts use `D:\work\Workspace\<checkout-directory-name>` and previous builds/releases use `D:\work\Snapshots\<checkout-directory-name>`. The equivalent `C:\work` layout is used only if drive D: does not exist, never as a fallback for access or space errors. Use the existing path helpers rather than hardcoding a checkout name.
+Current release files belong in local `installfiles`. Working artifacts use `D:\work\Workspace\<checkout-directory-name>`. Superseded builds/releases move without deletion to `D:\work\Trash\<checkout-directory-name>`; keep a prior build in `Snapshots` only for a documented current diagnostic or recovery dependency. The equivalent `C:\work` layout is used only if drive D: does not exist, never as a fallback for access or space errors. Use the existing path helpers rather than hardcoding a checkout name.
 
 ## Implementation expectations
 

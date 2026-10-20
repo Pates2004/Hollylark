@@ -153,7 +153,7 @@ internal abstract class AuxiliaryWindow : Window
     }
 }
 
-internal sealed class SettingsWindow : AuxiliaryWindow
+internal sealed partial class SettingsWindow : AuxiliaryWindow
 {
     private readonly UiPreferences baseline;
     private readonly UiPreferencesStore store;
@@ -237,6 +237,7 @@ internal sealed class SettingsWindow : AuxiliaryWindow
         BuildControls();
         BuildStartupAndClosing();
         BuildProfiles();
+        BuildHotkeys();
 
         Body.Children.Add(tabs);
         CloseButton.Visibility = Visibility.Collapsed;
@@ -329,6 +330,9 @@ internal sealed class SettingsWindow : AuxiliaryWindow
             (preferences, value) => preferences with { ValueDisplayMode = value });
         Toggle(panel, "AnnounceStateChangesCheckBox", Localization.Text("Settings.Announcements.Label"),
             preferences => preferences.AnnounceStateChanges, (preferences, value) => preferences with { AnnounceStateChanges = value }, verticalMargin: 8);
+        Toggle(panel, "PreserveVolatileSettingsCheckBox", Localization.Text("Settings.Retention.Label"),
+            preferences => preferences.PreserveVolatileSettings,
+            (preferences, value) => preferences with { PreserveVolatileSettings = value }, verticalMargin: 8);
         AddReset(panel, "Controls", Localization.Text("Settings.Controls.ResetScope"));
     }
 
@@ -597,8 +601,10 @@ internal sealed class SettingsWindow : AuxiliaryWindow
             {
                 GainControlMode = defaults.GainControlMode, ValueDisplayMode = defaults.ValueDisplayMode,
                 AutoApplySelections = defaults.AutoApplySelections, ShowHints = defaults.ShowHints,
-                ShowOperationMessages = defaults.ShowOperationMessages, AnnounceStateChanges = defaults.AnnounceStateChanges
+                ShowOperationMessages = defaults.ShowOperationMessages, AnnounceStateChanges = defaults.AnnounceStateChanges,
+                PreserveVolatileSettings = defaults.PreserveVolatileSettings
             },
+            "Hotkeys" => draft with { GlobalHotkeysEnabled = defaults.GlobalHotkeysEnabled, Hotkeys = HotkeyBinding.CreateDefaults() },
             "StartupAndClosing" => draft with
             {
                 StartWithWindows = defaults.StartWithWindows, CloseToTray = defaults.CloseToTray, ConfirmExit = defaults.ConfirmExit
@@ -736,6 +742,7 @@ internal sealed class SettingsWindow : AuxiliaryWindow
     private bool TryCommitSettings()
     {
         if (applyingProfile || committing || confirming || accepted) return false;
+        if (!ValidateHotkeyDraft()) return false;
         if (!string.IsNullOrWhiteSpace(profileName.Text))
         {
             tabs.SelectedItem = FindName("ProfilesSettingsTab");
@@ -818,14 +825,15 @@ internal sealed class SettingsWindow : AuxiliaryWindow
 
     private static UiPreferences Copy(UiPreferences preferences) => preferences with
     {
-        HiddenRows = [.. preferences.HiddenRows], AudioProfiles = [.. preferences.AudioProfiles]
+        HiddenRows = [.. preferences.HiddenRows], AudioProfiles = [.. preferences.AudioProfiles], Hotkeys = [.. preferences.Hotkeys]
     };
 
     private static bool SamePreferences(UiPreferences first, UiPreferences second) =>
         first.HiddenRows.ToHashSet(StringComparer.Ordinal).SetEquals(second.HiddenRows)
         && first.AudioProfiles.SequenceEqual(second.AudioProfiles)
-        && first with { HiddenRows = Array.Empty<string>(), AudioProfiles = Array.Empty<AudioProfile>() }
-            == second with { HiddenRows = Array.Empty<string>(), AudioProfiles = Array.Empty<AudioProfile>() };
+        && first.Hotkeys.SequenceEqual(second.Hotkeys)
+        && first with { HiddenRows = Array.Empty<string>(), AudioProfiles = Array.Empty<AudioProfile>(), Hotkeys = Array.Empty<HotkeyBinding>() }
+            == second with { HiddenRows = Array.Empty<string>(), AudioProfiles = Array.Empty<AudioProfile>(), Hotkeys = Array.Empty<HotkeyBinding>() };
 
     private sealed record SettingsChoice<TValue>(TValue Value, string Label)
     {

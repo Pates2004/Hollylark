@@ -26,6 +26,32 @@ internal static partial class Program
                 && arguments[0] == "--observe-arrow-automation")
                 return ObserveArrowAutomation(arguments[1], arguments.Length == 3);
             LarkControl.Windows.Localization.Initialize();
+            if (arguments.Contains("--native-hotkeys-only"))
+            {
+                VerifyNativeHotkeyRegistrationChecks();
+                Console.WriteLine($"PASS: {passed} native hotkey registration checks. Owned hidden windows only; no keys injected or physical device I/O.");
+                return 0;
+            }
+            if (arguments.Contains("--automation-controls-only") || arguments.Contains("--automation-core-only"))
+            {
+                VerifyHotkeyChecks();
+                VerifyDeviceSettingsRetentionChecks();
+                VerifyAutomationPreferences();
+                VerifyExpectedStateSafety().GetAwaiter().GetResult();
+                if (!arguments.Contains("--automation-core-only"))
+                {
+                    var application = new System.Windows.Application
+                    {
+                        ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown,
+                        ThemeMode = System.Windows.ThemeMode.Light
+                    };
+                    SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+                    try { VerifyAutomatedControlInterface(); }
+                    finally { application.Shutdown(); }
+                }
+                Console.WriteLine($"PASS: {passed} automation checks. Fake device and hotkey APIs only; no physical writes or global input.");
+                return 0;
+            }
             if (arguments.Contains("--single-instance-ui-only"))
             {
                 VerifySingleInstanceActivationApplication();
@@ -242,6 +268,10 @@ internal static partial class Program
             }
             VerifySingleInstanceChecks();
             VerifyLocalizationCore();
+            VerifyHotkeyChecks();
+            VerifyDeviceSettingsRetentionChecks();
+            VerifyAutomationPreferences();
+            VerifyExpectedStateSafety().GetAwaiter().GetResult();
             VerifyProtocol();
             VerifyAudioLevels();
             VerifyAudioPeakCalculations();

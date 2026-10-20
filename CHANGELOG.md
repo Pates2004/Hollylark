@@ -2,6 +2,21 @@
 
 User-visible changes are listed here. Entries describe changes, not a certification of hardware compatibility, NVDA speech or completed release validation.
 
+## [0.10.0] - 2026-10-20
+
+### Added
+
+- Editable opt-in global shortcuts, native action list, keyboard capture, conflict reporting, enable/disable and category defaults.
+- Default-on retention of confirmed volatile shared parameters after observed microphone reconnections, isolated by receiver USB path and persisted beside the executable. Never restores mute or automatically unmutes microphones.
+- Fresh expected-state guards, bounded restoration, strict local retention files and focused simulated-device/native API regression tests.
+
+### Fixed
+
+- Existing device-state announcements now use a background UI Automation notification provider without moving focus; unchanged polls remain silent.
+- Shortcut registration/persistence transactions keep unsaved bindings inactive and recover from conflicts without nested settings suspension.
+- Explicit status and identity reads remain read-only while preserving deferred reconnect restoration for subsequent background polling.
+- Build publication follows the current category policy: ordinary superseded binaries go to Trash, not indefinite archival snapshots; user data remains beside the current EXE.
+
 ## [0.9.1] - 2026-10-15
 
 First public release in `Pates2004/Hollylark`, with a portable Windows x64 ZIP under tag `v0.9.1`.

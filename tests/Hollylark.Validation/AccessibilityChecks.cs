@@ -358,6 +358,7 @@ internal static partial class Program
                 FindById<CheckBox>(settings, "ShowOperationMessagesCheckBox"),
                 FindById<ComboBox>(settings, "ValueDisplayModeChoice"),
                 FindById<CheckBox>(settings, "AnnounceStateChangesCheckBox"),
+                FindById<CheckBox>(settings, "PreserveVolatileSettingsCheckBox"),
                 FindById<Button>(settings, "ResetControlsSettingsButton"),
                 save
             ];
@@ -382,8 +383,8 @@ internal static partial class Program
             "The optional settings category heading follows the hints preference");
         TabItem appearance = tabs.Items.OfType<TabItem>().Single(tab =>
             AutomationProperties.GetAutomationId(tab) == "AppearanceSettingsTab");
-        Check(tabs.Items.Count == 5 && ReferenceEquals(tabs.SelectedItem, appearance),
-            "Settings open on Appearance with five available categories");
+        Check(tabs.Items.Count == 6 && ReferenceEquals(tabs.SelectedItem, appearance),
+            "Settings open on Appearance with six available categories");
         CheckKeyboardFocus(FindById<ComboBox>(window, "SettingsLanguageChoice"), "Settings initially focus the first available selector, like the reference");
         TabItem controls = SelectSettingsControlsTab(window);
         CheckBox hints = FindById<CheckBox>(window, "ShowHintsCheckBox");
@@ -403,6 +404,7 @@ internal static partial class Program
             FindById<CheckBox>(window, "ShowOperationMessagesCheckBox"),
             FindById<ComboBox>(window, "ValueDisplayModeChoice"),
             FindById<CheckBox>(window, "AnnounceStateChangesCheckBox"),
+            FindById<CheckBox>(window, "PreserveVolatileSettingsCheckBox"),
             FindById<Button>(window, "ResetControlsSettingsButton"),
             save,
             cancel
@@ -619,5 +621,6 @@ internal static partial class Program
         : element?.GetType().Name ?? "none";
 
     private static int CountMockWrites(FakeTransport transport) =>
-        transport.Commands.Count(command => command is not A1Command.GetStatus and not A1Command.GetVersion);
+        transport.Commands.Count(command => command is not (A1Command.GetStatus or A1Command.GetVersion
+            or A1Command.GetSerialNumber or A1Command.GetReceiverMacAddress or A1Command.GetTransmitterMacAddress));
 }

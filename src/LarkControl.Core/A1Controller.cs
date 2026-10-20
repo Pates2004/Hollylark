@@ -83,7 +83,7 @@ public sealed class A1Controller : IDisposable
     }
 
     public async Task<A1Status> ApplyAsync(SettingChange change, CancellationToken cancellationToken = default,
-        MicrophoneControlScope? scope = null)
+        MicrophoneControlScope? scope = null, Func<A1Status, bool>? expectedState = null)
     {
         ArgumentNullException.ThrowIfNull(change);
         ArgumentNullException.ThrowIfNull(change.Payload);
@@ -97,6 +97,8 @@ public sealed class A1Controller : IDisposable
         {
             A1Status currentStatus = await ReadStatusCoreAsync(linked.Token).ConfigureAwait(false);
             scope?.Validate(currentStatus, change with { Payload = payload });
+            if (expectedState is not null && !expectedState(currentStatus))
+                throw new DeviceStateChangedException(currentStatus);
             if (!currentStatus.Transmitters.Any(transmitter => transmitter.Connected))
                 throw new DeviceWriteSafetyException(currentStatus);
             if (change.Command == A1Command.SetMute &&
