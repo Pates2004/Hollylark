@@ -18,6 +18,11 @@ try {
     dotnet publish src/LarkControl.Windows/LarkControl.Windows.csproj -c Release -r win-x64 --self-contained false -p:PublishSelfContained=false -p:PublishSingleFile=true -p:UseAppHost=true -p:PublishTrimmed=false -o $staging --nologo
     if ($LASTEXITCODE -ne 0) { throw 'Publishing failed; the installed release has not been replaced.' }
     if (-not (Test-Path -LiteralPath "$staging\Hollylark.exe")) { throw 'Published executable is missing.' }
+    $prismLibrary = Join-Path $staging 'prism.dll'
+    if (-not (Test-Path -LiteralPath $prismLibrary) -or
+        (Get-FileHash -LiteralPath $prismLibrary -Algorithm SHA256).Hash -ne '99A73CD24AC777EDE4A5742E62CC3615EC7F5722862C0D9B5E4B3672DCF46CC4') {
+        throw 'Published Prism x64 library is missing or differs from Prismatoid 0.4.0.'
+    }
     foreach ($language in @('pl', 'en')) {
         $catalog = "$staging\langs\$language.lng"
         if (-not (Test-Path -LiteralPath $catalog)) { throw "Published language file is missing: $language" }
@@ -34,7 +39,7 @@ try {
         if ($running) { throw 'Close Hollylark before replacing the installed release. No user process is stopped.' }
         $releaseItems = @(Get-ChildItem -LiteralPath $installation -Force | Where-Object { $_.Name -notin @('data', 'reports') })
         foreach ($item in $releaseItems) {
-            if ($item.Name -notin @('Hollylark.exe', 'langs', 'SHA256SUMS.txt', 'README.md', 'README.pl.md', 'LICENSE', 'THIRD-PARTY-NOTICES.txt') -and
+            if ($item.Name -notin @('Hollylark.exe', 'prism.dll', 'langs', 'SHA256SUMS.txt', 'README.md', 'README.pl.md', 'LICENSE', 'THIRD-PARTY-NOTICES.txt') -and
                 $item.Name -notmatch '^Hollylark-\d+\.\d+\.\d+-win-x64\.zip$') {
                 throw "Unknown installation item must be reviewed before publication: $($item.FullName)"
             }

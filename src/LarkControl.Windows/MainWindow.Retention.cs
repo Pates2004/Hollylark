@@ -24,7 +24,7 @@ public partial class MainWindow
         {
             retentionFailureReported = true;
             string message = Localization.Text("Retention.StoreError", retentionStore.FilePath);
-            SetResult(message, true);
+            SetResult(message, true, announce: false);
             AnnounceBackgroundNotification(message, "Hollylark.RetentionError");
         }
         return false;
@@ -93,7 +93,7 @@ public partial class MainWindow
             {
                 HandleSessionError(exception);
                 string warning = Localization.Text("Retention.Interrupted");
-                SetResult(ResultText + " " + warning, true);
+                SetResult(ResultText + " " + warning, true, announce: false);
                 AnnounceBackgroundNotification(warning, "Hollylark.RetentionError");
             }
         }
@@ -106,8 +106,9 @@ public partial class MainWindow
                 busy = wasBusy;
                 UpdateView();
                 string message = Localization.Text(restored ? "Retention.Restored" : "Retention.Interrupted");
-                SetResult(message, !restored);
-                if (!restored || preferences.AnnounceStateChanges)
+                bool announce = !restored || preferences.AnnounceStateChanges;
+                SetResult(message, !restored, announce: !announce);
+                if (announce)
                     AnnounceBackgroundNotification(message, "Hollylark.Retention");
                 RetentionStorageAvailable();
             }

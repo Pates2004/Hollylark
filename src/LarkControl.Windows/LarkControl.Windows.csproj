@@ -8,7 +8,8 @@
     <AssemblyName>Hollylark</AssemblyName>
     <Product>Hollylark</Product>
     <Title>Hollylark</Title>
-    <Version>0.10.0</Version>
+    <Version>0.10.1</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
   <ItemGroup>
@@ -18,8 +19,10 @@
     <ProjectReference Include="../LarkControl.Core/LarkControl.Core.csproj" />
     <PackageReference Include="HidSharp" Version="2.6.4" />
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <PackageReference Include="Prismatoid" Version="0.4.0" />
     <EmbeddedResource Include="$(NuGetPackageRoot)hidsharp/2.6.4/LICENSE.txt" LogicalName="HidSharp.LICENSE.txt" />
     <EmbeddedResource Include="../../THIRD-PARTY-NOTICES.txt" LogicalName="Hollylark.NOTICES.txt" />
     <EmbeddedResource Include="Resources/NAudio.LICENSE.txt" LogicalName="NAudio.LICENSE.txt" />
+    <EmbeddedResource Include="Resources/Prism.NOTICES.txt" LogicalName="Prism.NOTICES.txt" />
   </ItemGroup>
 </Project>

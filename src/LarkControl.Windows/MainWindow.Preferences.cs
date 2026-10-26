@@ -16,6 +16,8 @@ public partial class MainWindow
     private readonly IDesktopIntegration desktopIntegration;
     private readonly Func<string, string, bool> confirmAction;
     private readonly Action<string>? stateAnnouncement;
+    private readonly IScreenReaderSpeech? screenReader;
+    private string? lastSpeechFailure;
     private readonly Action<string> desktopError;
     private readonly DispatcherTimer autoApplyTimer;
     private readonly HashSet<SettingRowViewModel> pendingAutomaticChanges = [];
@@ -341,6 +343,16 @@ public partial class MainWindow
     {
         if (closed) return;
         if (stateAnnouncement is not null) { stateAnnouncement(message); return; }
+        UiNotificationRouting.Announce(screenReader, message, () => RaiseBackgroundNotification(message, activity), exception =>
+        {
+            if (lastSpeechFailure == exception.Message) return;
+            lastSpeechFailure = exception.Message;
+            Log(Localization.Text("Main.Log.AccessibilityError", exception.Message));
+        });
+    }
+
+    private void RaiseBackgroundNotification(string message, string activity)
+    {
         Window target = UiNotificationRouting.SelectStateTarget(this, OwnedWindows.OfType<AuxiliaryWindow>());
         try
         {

@@ -58,12 +58,13 @@ public partial class MainWindow : Window
     public string ResultText => ResultReadout.Text;
     private IEnumerable<SettingRowViewModel> AllSettings => AudioSettings.Concat(DeviceSettings);
 
-    public MainWindow() : this(HidTransport.FindReceivers, receiver => new HidTransport(receiver)) { }
+    public MainWindow() : this(HidTransport.FindReceivers, receiver => new HidTransport(receiver),
+        screenReader: new PrismScreenReaderSpeech()) { }
 
     public MainWindow(Func<IReadOnlyList<ReceiverInfo>> discover, Func<ReceiverInfo, IA1Transport> factory,
         string? baseDirectory = null, IDesktopIntegration? desktop = null, Func<string, string, bool>? confirm = null,
         Action<string>? announceState = null, Action<string>? reportDesktopError = null, bool automaticReceiverManagement = true,
-        IHotkeyNativeApi? hotkeyNativeApi = null)
+        IHotkeyNativeApi? hotkeyNativeApi = null, IScreenReaderSpeech? screenReader = null)
     {
         ArgumentNullException.ThrowIfNull(discover);
         ArgumentNullException.ThrowIfNull(factory);
@@ -71,6 +72,7 @@ public partial class MainWindow : Window
         this.factory = factory;
         this.automaticReceiverManagement = automaticReceiverManagement;
         this.hotkeyNativeApi = hotkeyNativeApi;
+        this.screenReader = screenReader;
         desktopIntegration = desktop ?? new DesktopIntegration();
         if (desktopIntegration is DesktopIntegration nativeDesktop) nativeDesktop.Failed += OnDesktopFailure;
         Func<string, string, bool> confirmDialog = confirm ?? ((message, title) => MessageBox.Show(GetDialogOwner(), message, title,
@@ -632,7 +634,7 @@ public partial class MainWindow : Window
             return state;
         }, Localization.Text("Main.Identity.Success"), observeSettings: true);
 
-    private void SetResult(string message, bool important = false)
+    private void SetResult(string message, bool important = false, bool announce = true)
     {
         if (closed) return;
         UiSupport.UpdateReadout(ResultReadout, message);
@@ -640,7 +642,7 @@ public partial class MainWindow : Window
         resultIsImportant = important;
         UpdateResultPresentation();
         Log(message);
-        AnnounceOperationResult(message, important);
+        if (announce) AnnounceOperationResult(message, important);
     }
 
     private bool RequireConnectedMicrophone()
@@ -836,6 +838,11 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs eventArgs)
     {
         closed = true;
+        try { screenReader?.Dispose(); }
+        catch (Exception exception) when (UiNotificationRouting.IsSpeechFailure(exception))
+        {
+            Log(Localization.Text("Main.Log.AccessibilityError", exception.Message));
+        }
         globalHotkeys?.Dispose();
         receiverTimer.Stop();
         EndSession();

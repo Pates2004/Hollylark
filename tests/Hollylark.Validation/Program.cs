@@ -26,6 +26,26 @@ internal static partial class Program
                 && arguments[0] == "--observe-arrow-automation")
                 return ObserveArrowAutomation(arguments[1], arguments.Length == 3);
             LarkControl.Windows.Localization.Initialize();
+            if (arguments.Length is 1 or 2 && arguments[0] == "--native-prism-only")
+            {
+                VerifyNativePrismChecks(arguments.Length == 2 ? arguments[1] : null);
+                Console.WriteLine($"PASS: {passed} native Prism checks. No speech, cancellation, physical USB/audio or global input.");
+                return 0;
+            }
+            if (arguments.Contains("--prism-only"))
+            {
+                VerifyPrismSpeechChecks();
+                var application = new System.Windows.Application
+                {
+                    ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown,
+                    ThemeMode = System.Windows.ThemeMode.Light
+                };
+                SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+                try { VerifyPrismBackgroundInterfaceChecks(); }
+                finally { application.Shutdown(); }
+                Console.WriteLine($"PASS: {passed} Prism routing checks. Fake readers and receivers only; no native speech or global input.");
+                return 0;
+            }
             if (arguments.Contains("--native-hotkeys-only"))
             {
                 VerifyNativeHotkeyRegistrationChecks();
@@ -268,6 +288,8 @@ internal static partial class Program
             }
             VerifySingleInstanceChecks();
             VerifyLocalizationCore();
+            VerifyArrowFocusMetadataGuards();
+            VerifyPrismSpeechChecks();
             VerifyHotkeyChecks();
             VerifyDeviceSettingsRetentionChecks();
             VerifyAutomationPreferences();

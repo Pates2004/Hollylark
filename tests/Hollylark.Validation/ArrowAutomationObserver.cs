@@ -71,11 +71,39 @@ internal static partial class Program
 
     private static void VerifyArrowFocusMetadata(ExternalArrowObserver observer, int marker, string expected)
     {
-        Check(observer.Since(marker).Any(message => message.Kind == "focus" && message.Name == expected
+        Check(observer.WaitForEvent(() => HasNativeArrowFocus(observer.Since(marker), expected), "native WPF focus metadata: " + expected),
+            "External focused item has a native WPF identity, control/content exposure and selection support: " + expected);
+    }
+
+    private static bool HasNativeArrowFocus(IEnumerable<ArrowAutomationMessage> messages, string expected) =>
+        messages.Any(message => message.Kind == "focus" && message.Name == expected
             && message.Element is { Framework: "WPF", ControlType: "ControlType.ListItem", IsControlElement: true,
                 IsContentElement: true, IsKeyboardFocusable: true, HasKeyboardFocus: true, IsEnabled: true,
-                HasSelectionItemPattern: true, RuntimeId.Length: > 0 }),
-            "External focused item has a native WPF identity, control/content exposure and selection support: " + expected);
+                HasSelectionItemPattern: true, RuntimeId.Length: > 0 });
+
+    private static void VerifyArrowFocusMetadataGuards()
+    {
+        const string expected = "Microphone 2";
+        var metadata = new ArrowElementMetadata([7, 1, 2], expected, "WPF", "ListBoxItem", "ControlType.ListItem",
+            true, true, true, true, false, true, true, false);
+        var native = new ArrowAutomationMessage("focus", "TX2.Item", expected, null, [], "native") { Element = metadata };
+        var proxy = native with { Element = metadata with { Framework = "", ClassName = "", IsKeyboardFocusable = false } };
+        Check(!HasNativeArrowFocus([proxy], expected) && HasNativeArrowFocus([proxy, native], expected),
+            "An early compatibility-proxy focus event cannot replace the later native WPF event");
+        Check(HasNativeArrowFocus([native], expected), "Native focus may precede selection without weakening role or pattern checks");
+        foreach (ArrowElementMetadata rejected in new[]
+        {
+            metadata with { Framework = "" }, metadata with { ControlType = "ControlType.Text" },
+            metadata with { IsControlElement = false }, metadata with { IsContentElement = false },
+            metadata with { IsKeyboardFocusable = false }, metadata with { HasKeyboardFocus = false },
+            metadata with { IsEnabled = false }, metadata with { HasSelectionItemPattern = false }, metadata with { RuntimeId = [] }
+        })
+            Check(!HasNativeArrowFocus([native with { Element = rejected }], expected),
+                "Native focus still requires every original identity, role, focus and selection-pattern guard");
+        Check(!HasNativeArrowFocus([native with { Kind = "selection" }], expected)
+            && !HasNativeArrowFocus([native with { Name = "previous item" }], expected)
+            && !HasNativeArrowFocus([native with { Element = null }], expected),
+            "Selection-only, previous-name and absent-metadata records cannot satisfy native focus");
     }
 
     private static int ObserveArrowAutomation(string handleText, bool includeFocus)
@@ -355,6 +383,8 @@ internal static partial class Program
         }
 
         internal int Mark() => messages.Count;
+
+        internal bool WaitForEvent(Func<bool> condition, string operation) => WaitForEvent(condition, ActionTimeout, operation);
 
         internal bool WaitForEvent(Func<bool> condition, TimeSpan timeout, string operation)
         {

@@ -2,6 +2,15 @@
 
 User-visible changes are listed here. Entries describe changes, not a certification of hardware compatibility, NVDA speech or completed release validation.
 
+## [0.10.1] - 2026-10-27
+
+### Fixed
+
+- Send background device announcements directly to a running screen reader through Prismatoid 0.4.0 / Prism v0.17.3, without requiring an active Hollylark window or requesting speech cancellation.
+- Preserve the existing announcement preference and UI Automation fallback; do not also send a duplicate notification after a successful direct request or select standalone TTS voices.
+- Own native backend handles explicitly so unavailable/restarted readers and initialization failures do not leak handles through the binding's high-level acquisition path.
+- Ship the pinned Windows x64 prism.dll beside the executable and include upstream notices and license texts in Help.
+
 ## [0.10.0] - 2026-10-20
 
 ### Added

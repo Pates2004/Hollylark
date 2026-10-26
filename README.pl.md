@@ -4,11 +4,11 @@
 
 Nieoficjalna aplikacja Windows do sterowania odbiornikiem **Hollyland LARK A1 USB-C**. Hollylark zapewnia natywne kontrolki WPF, obsługę klawiatury i dostępne etykiety dla NVDA. Jest projektem niezależnym od Hollyland i nie ma poparcia producenta.
 
-**Wersja źródeł 0.10.0** · Windows x64 · .NET Desktop Runtime 10 x64
+**Wersja źródeł 0.10.1** · Windows x64 · .NET Desktop Runtime 10 x64
 
 ## Pobieranie i uruchamianie
 
-Najnowsza opublikowana paczka portable to **v0.9.1**. Ten przewodnik opisuje **źródła 0.10.0 na gałęzi `main`**; aby korzystać z nowych skrótów globalnych i zachowywania niestałych ustawień przed publikacją odpowiedniej paczki, [zbuduj program ze źródeł](#kompilacja).
+Najnowsza opublikowana paczka portable to **v0.9.1**. Ten przewodnik opisuje **źródła 0.10.1**; aby korzystać ze skrótów globalnych, zachowywania niestałych ustawień i bezpośrednich ogłoszeń Prism przed publikacją odpowiedniej paczki, [zbuduj program ze źródeł](#kompilacja).
 
 1. Pobierz wersję portable w ZIP z [najnowszego wydania na GitHubie](https://github.com/Pates2004/Hollylark/releases/latest).
 2. Osobno zainstaluj **Microsoft .NET Desktop Runtime 10 dla Windows x64**. Hollylark jest aplikacją framework-dependent: nie zawiera środowiska .NET. Natywny host GUI Windows wyświetla standardową propozycję pobrania .NET, gdy brakuje wymaganego środowiska.
@@ -16,12 +16,15 @@ Najnowsza opublikowana paczka portable to **v0.9.1**. Ten przewodnik opisuje **�
 
    ```text
    Hollylark.exe
+   prism.dll
    langs/
      pl.lng
      en.lng
    ```
 
 4. Uruchom `Hollylark.exe`, wybierz opcje pierwszego uruchomienia i naciśnij **Kontynuuj**. **Anuluj** kończy program bez zapisywania i otwierania głównego okna.
+
+Plik `prism.dll` jest dołączany do buildów 0.10.1; starsze opublikowane paczki go nie zawierają.
 
 Domyślnym językiem jest polski. Angielski można wybrać już w kreatorze pierwszego uruchomienia. Później wybierz **Program → Ustawienia → Wygląd → Język**, zapisz przez **OK**, całkowicie zakończ program i uruchom go ponownie. Wymagane są oba pliki językowe, niezależnie od wybranego języka.
 
@@ -64,7 +67,7 @@ Otwórz **Ustawienia → Skróty klawiszowe**, wybierz akcję strzałkami, a nas
 
 Globalne skróty są **domyślnie wyłączone**. Ich wyłączanie nie usuwa przypisań. Przywrócenie domyślnych tej kategorii odtwarza kombinacje i ponownie je wyłącza. Domyślne kombinacje używają Ctrl+Alt+Shift: F1 pokazuje Hollylark, F5 odczytuje stan, F2 przełącza wyciszenie wybranego mikrofonu/grupy, F3 — wszystkich mikrofonów, strzałki góra/dół zmieniają wzmocnienie, F6 redukcję szumu, F7 korektor EQ, F8 pogłos, F9 diody LED, a F10 kanały mono/stereo. Automatyczne wyłączenie i rozpoznawanie mikrofonów początkowo nie mają przypisań. Domyślne nie używają liter, aby nie zabierać znaków wpisywanych przez AltGr. Polecenia sprzętowe używają świeżego odczytu i ograniczeń mikrofon/grupa, bez przenoszenia fokusu. Globalny odczyt odmawia przy niezastosowanych wyborach; zwykłe F5 nadal jawnie je odrzuca. Skróty są wstrzymane w Ustawieniach i zwalniane przy zakończeniu aplikacji. Program musi pozostać uruchomiony.
 
-Istniejąca opcja **Ogłaszaj zmiany stanu urządzenia za pomocą czytnika ekranu** obejmuje teraz również powiadomienia UI Automation w tle o potwierdzonych zmianach wykonanych telefonem lub przyciskami mikrofonu. Nie przenosi fokusu, nie powtarza niezmienionych wartości ani wahań baterii. Odtworzenie powiadomienia zależy od ustawień czytnika; testy automatyczne nie potwierdzają rzeczywistej mowy NVDA.
+Istniejąca opcja **Ogłaszaj zmiany stanu urządzenia za pomocą czytnika ekranu** przekazuje potwierdzone zmiany z telefonu i przycisków mikrofonu bezpośrednio uruchomionemu czytnikowi przez **Prism**, za pomocą bindingu .NET **Prismatoid**. Nie wymaga aktywnego okna Hollylarka: działa również po zminimalizowaniu lub ukryciu w zasobniku. Plik `prism.dll` musi pozostać obok EXE. Jeśli działa kilka obsługiwanych czytników, pierwszeństwo ma NVDA; osobne głosy SAPI/OneCore nie są wybierane. Bezpośrednie komunikaty nie żądają przerwania bieżącej mowy czytnika, nie przenoszą fokusu, nie powtarzają niezmienionych wartości ani wahań baterii. Udane bezpośrednie przekazanie wyklucza dodatkowe wysłanie tego samego powiadomienia UI Automation. Jeśli czytnik jest niedostępny lub przekazanie zawiedzie, pozostaje UI Automation; wtedy odczyt zależy od polityki czytnika. Czytnik musi działać w tej samej sesji Windows i na tym samym pulpicie. Testy automatyczne nie potwierdzają mowy rzeczywiście usłyszanej przez człowieka.
 
 **Zachowuj niestałe ustawienia mikrofonów** jest domyślnie włączone. Potwierdzone wzmocnienie, kanały, redukcja szumu, EQ, pogłos, diody, automatyczne wyłączenie i obsługiwane rozpoznawanie są pamiętane osobno dla ścieżki USB odbiornika w `data/retained-settings.json` obok EXE. Zmiany zewnętrzne podczas ciągłego połączenia stają się nową zapamiętaną konfiguracją. Po wykrytym rozłączeniu i powrocie program przywraca różniące się wspólne parametry ze świeżą kontrolą grupy, konfliktów i odczytu. Dotyczy to całej aktywnej grupy, niezależnie od aktualnie pokazanego pojedynczego mikrofonu. Wyciszenie nie jest przywracane i program nigdy sam nie odcisza mikrofonów. Jeśli pierwszy odczyt sprzętu zastanie aktywne mikrofony, przyjmuje ich rzeczywisty stan bez wysyłania starej konfiguracji; jeśli najpierw zastanie je rozłączone, zapamiętane ustawienia mogą wrócić po ich połączeniu. Inna ścieżka USB ma własną konfigurację. Cyklu całkowicie pomiędzy odczytami lub przy zamkniętym Hollylarku nie da się wiarygodnie rozpoznać; protokół nie podaje przyczyny zmiany wartości. Błąd lub zmiana podczas przywracania kończy próbę bez pętli. Program nie odcisza mikrofonów ani nie omija wymaganej liczby TX, aby wymusić niedostępną zmianę redukcji szumu lub rozpoznawania. Niezastosowane wybory albo otwarte Ustawienia blokują rozpoczęcie przywracania. F5 i odczyt identyfikatorów pozostają tylko odczytem; odroczone przywrócenie może nastąpić przy późniejszym odczycie w tle. Wyłącz zachowywanie, aby zapobiec takim automatycznym zapisom.
 
@@ -116,7 +119,7 @@ Artefakty kompilacji trafiają do `D:\work\Workspace\<nazwa-katalogu-źródeł>`
 
 ## Walidacja
 
-Wersja 0.10.0 przeszła 36 015 kontroli pełnej regresji na osobnym pulpicie Windows, w tym symulowane powroty mikrofonów, transakcje skrótów i zewnętrzne kontrole fokusu/zaznaczenia listy akcji UI Automation po polsku i angielsku. Osobno przeszło 10 kontroli prawdziwej rejestracji skrótów Win32 i 12 kontroli przywracania okien WPF; przeszły też próby zasobnika Explorer. Zakresy częściowo się pokrywają i nie potwierdzają fizycznego wywoływania skrótów z innej aplikacji, rzeczywistej mowy NVDA ani skutków ustawień na mikrofonach — te próby wymagają użytkownika/sprzętu.
+Wersja 0.10.1 przeszła 36 374 kontroli pełnej regresji na osobnym pulpicie Windows. Osobny przebieg 347 kontroli Prism obejmuje symulowane błędy i czas życia zasobów natywnych, pojedynczą ścieżkę ogłaszania oraz potwierdzone komunikaty PL/EN przy aktywnym, nieaktywnym, zminimalizowanym i ukrytym oknie bez przenoszenia fokusu. Osiem prób natywnych załadowało ustaloną bibliotekę x64 i zainicjalizowało działający backend NVDA bez wysyłania mowy ani anulowania; przeszło również 12 kontroli przywracania okien WPF i dziewięć prób natywnego zasobnika Explorer. Zakresy częściowo się pokrywają i nie potwierdzają mowy usłyszanej przez człowieka, fizycznego wywoływania skrótów z innej aplikacji ani skutków ustawień na mikrofonach — te próby wymagają użytkownika/sprzętu.
 
 Kontrole konsolowe uruchomisz poleceniami:
 
@@ -147,7 +150,7 @@ Te kontrole korzystają z okien WPF, symulowanego odbiornika i zasobnika w pami�
 
 ## Informacje o zależnościach
 
-Hollylark używa HidSharp i NAudio. Zachowaj informacje o autorach i teksty ich licencji; zobacz [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) oraz licencje bibliotek dostępne w oknie Pomocy aplikacji.
+Hollylark używa HidSharp, NAudio i Prism przez Prismatoid. Zachowaj informacje o autorach i teksty ich licencji; zobacz [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) oraz licencje bibliotek dostępne w oknie Pomocy aplikacji.
 
 ## Licencja
 

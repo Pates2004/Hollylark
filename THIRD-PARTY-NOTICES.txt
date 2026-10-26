@@ -14,6 +14,16 @@ under the MIT License. The original license is embedded as NAudio.LICENSE.txt
 and available on the Help page.
 Project: https://github.com/naudio/NAudio
 
+Hollylark uses Prismatoid 0.4.0 (binding source commit
+ed64eceafc0c5d5417c5202d03c435b4cb33a3d4) and its bundled native
+Prism v0.17.3, distributed under the Mozilla Public License 2.0.
+The unchanged native library is supplied as prism.dll beside the EXE.
+MPL-2.0 and the upstream dependency notices and license texts are
+embedded as Prism.NOTICES.txt and available on the Help page.
+Binding source: https://github.com/the-byte-bender/Prismatoid/tree/ed64eceafc0c5d5417c5202d03c435b4cb33a3d4
+Native source: https://github.com/ethindp/prism/tree/v0.17.3
+Native notices: https://github.com/ethindp/prism/blob/v0.17.3/NOTICE
+
 This framework-dependent release requires Microsoft .NET Desktop Runtime 10
 (Windows x64). The .NET runtime is NOT bundled with this application.
 Its licenses are supplied with Microsoft's separately installed runtime.

@@ -11,6 +11,11 @@ $InterfaceLanguage = $InterfaceLanguage.ToLowerInvariant()
 $languageNameKey = if ($InterfaceLanguage -eq 'pl') { 'Settings.Language.Polish' } else { 'Settings.Language.English' }
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $executable = Join-ProjectMaterialPath $projectRoot 'installfiles\Hollylark.exe'
+$prismLibrary = Join-Path (Split-Path -Parent $executable) 'prism.dll'
+if (-not (Test-Path -LiteralPath $prismLibrary) -or
+    (Get-FileHash -LiteralPath $prismLibrary -Algorithm SHA256).Hash -ne '99A73CD24AC777EDE4A5742E62CC3615EC7F5722862C0D9B5E4B3672DCF46CC4') {
+    throw 'Current release requires the pinned Prismatoid 0.4.0 x64 prism.dll beside Hollylark.exe.'
+}
 if (Get-Process | Where-Object { try { $_.Path -eq $executable } catch { $false } }) {
     throw 'Close the existing Hollylark instance before validating the release; user processes are not stopped.'
 }
@@ -861,6 +866,7 @@ try {
         Time = (Get-Date).ToString('o')
         Executable = $executable
         SHA256 = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash
+        PrismLibrarySHA256 = (Get-FileHash -LiteralPath $prismLibrary -Algorithm SHA256).Hash
         Bytes = $bytes.Length
         Version = [Diagnostics.FileVersionInfo]::GetVersionInfo($executable).ProductVersion
         NativeMachine = 'AMD64'

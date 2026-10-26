@@ -86,7 +86,7 @@ internal sealed class HelpWindow : AuxiliaryWindow
     private static string ReadLicenses()
     {
         var text = new StringBuilder();
-        foreach (string resource in new[] { "HidSharp.LICENSE.txt", "NAudio.LICENSE.txt", "Hollylark.NOTICES.txt" })
+        foreach (string resource in new[] { "HidSharp.LICENSE.txt", "NAudio.LICENSE.txt", "Prism.NOTICES.txt", "Hollylark.NOTICES.txt" })
         {
             using Stream? stream = typeof(MainWindow).Assembly.GetManifestResourceStream(resource);
             if (stream is null)

@@ -36,7 +36,7 @@ public partial class MainWindow
     private void ReportHotkeyFailure(HotkeyOperationResult result)
     {
         string message = HotkeyFailureMessage(result);
-        SetResult(message, true);
+        SetResult(message, true, announce: false);
         AnnounceBackgroundNotification(message, "Hollylark.HotkeysError");
     }
 

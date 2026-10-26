@@ -4,11 +4,11 @@
 
 An unofficial Windows application for controlling a **Hollyland LARK A1 USB-C** receiver. Hollylark provides native WPF controls, keyboard navigation and accessible labels for NVDA. It is independent of Hollyland and is not endorsed by the manufacturer.
 
-**Source version 0.10.0** · Windows x64 · .NET Desktop Runtime 10 x64
+**Source version 0.10.1** · Windows x64 · .NET Desktop Runtime 10 x64
 
 ## Download and launch
 
-The latest published portable package is **v0.9.1**. This guide describes the **0.10.0 source on `main`**; [build from source](#build) to use the new global shortcuts and volatile-setting preservation before a matching package is released.
+The latest published portable package is **v0.9.1**. This guide describes the **0.10.1 source**; [build from source](#build) to use global shortcuts, volatile-setting preservation and direct Prism announcements before a matching package is released.
 
 1. Download the portable ZIP from the [latest GitHub release](https://github.com/Pates2004/Hollylark/releases/latest).
 2. Install **Microsoft .NET Desktop Runtime 10 for Windows x64** separately. Hollylark is framework-dependent: it does not bundle .NET. Its native Windows GUI host offers the standard .NET download prompt when the required runtime is missing.
@@ -16,12 +16,15 @@ The latest published portable package is **v0.9.1**. This guide describes the **
 
    ```text
    Hollylark.exe
+   prism.dll
    langs/
      pl.lng
      en.lng
    ```
 
 4. Run `Hollylark.exe`, choose your first-run options and select **Continue**. **Cancel** exits without saving or opening the main window.
+
+`prism.dll` is supplied with 0.10.1 builds; older published packages do not contain it.
 
 Polish is the default language. You can select English in the first-run wizard. Later, choose **Program → Settings → Appearance → Language**, save with **OK**, then fully exit and restart the application. Both language files are required, regardless of the selected language.
 
@@ -64,7 +67,7 @@ Open **Settings → Keyboard shortcuts**, select an action with the arrow keys, 
 
 Global shortcuts are **disabled by default**. Enabling/disabling keeps the assignments; resetting this category restores its defaults and disables it again. Defaults use Ctrl+Alt+Shift: F1 shows Hollylark, F5 reads status, F2 toggles the selected microphone/group, F3 toggles all microphones, Up/Down change gain, F6 cycles noise reduction, F7 cycles EQ, F8 cycles reverb, F9 toggles LEDs and F10 changes mono/stereo. Auto-off and identification actions start unassigned. Defaults avoid letter keys so they do not consume AltGr text entry. Hardware actions use fresh status and the existing individual/group restrictions without moving focus. A global read refuses when unsent drafts exist; ordinary F5 still explicitly discards drafts. Registrations are suspended while Settings is open and released on exit. Hollylark must remain running for global shortcuts to work.
 
-The existing **Announce device state changes through the screen reader** option now also sends background UI Automation notifications for confirmed changes made through a phone or microphone buttons. It does not move focus, repeat unchanged values or announce battery fluctuations. Screen-reader settings determine how notifications are presented; actual NVDA speech is not certified by automated tests.
+The existing **Announce device state changes through the screen reader** option sends confirmed changes made through a phone or microphone buttons directly to a running reader through **Prism**, using its .NET binding **Prismatoid**. This does not require an active Hollylark window: it also works while minimized or hidden in the tray. Keep `prism.dll` beside the EXE. NVDA has priority if several supported readers are running; standalone SAPI/OneCore voices are not selected. Direct requests do not interrupt current reader speech, move focus, repeat unchanged values or announce battery fluctuations. A successful direct request suppresses the duplicate UI Automation notification. If no supported reader is available or direct output fails, Hollylark falls back to UI Automation; presentation then depends on reader policy. Readers must share the Windows session and desktop. Automated tests do not certify speech actually heard by a person.
 
 **Preserve volatile microphone settings** is enabled by default. Confirmed gain, channels, noise reduction, EQ, reverb, LEDs, auto-off and supported identification settings are remembered per receiver USB path in `data/retained-settings.json`, beside the EXE. Continuous-session external changes become the new baseline. After a detected disconnection/reconnection, differing shared parameters are restored with fresh group checks, conflict detection and readback. This affects the whole active group, regardless of the displayed individual target. Mute is never restored and microphones are never automatically unmuted. If the first device snapshot already has active microphones, their actual state is adopted without writing an old configuration; if startup first observes them disconnected, remembered settings can be restored when they return. A different USB path gets its own baseline. Power cycles entirely between polls or while Hollylark is closed cannot be identified reliably; the protocol does not report why a value changed. Failures or concurrent changes stop the attempt without repeated write loops. Unavailable noise/identification changes are not forced by unmuting or bypassing microphone-count gates. Unsent drafts or open Settings prevent a new restoration attempt. F5 and explicit identity reads remain read-only; a deferred reconnect restoration can occur on a later background poll. Disable preservation to prevent these automatic writes.
 
@@ -116,7 +119,7 @@ Build artifacts go to `D:\work\Workspace\<checkout-directory-name>`. Superseded 
 
 ## Validation
 
-Version 0.10.0 passed 36,015 checks in the full isolated Windows regression suite, including simulated reconnect restoration, shortcut transactions and external UI Automation action-list focus/selection checks in Polish and English. Separate runs passed 10 real Win32 hotkey-registration checks and 12 WPF window-restoration checks; native Explorer tray checks also passed. These sets overlap and do not certify physical keyboard-triggered cross-application dispatch, actual NVDA speech or physical microphone effects, which still require user/hardware testing.
+Version 0.10.1 passed 36,374 checks in the full isolated Windows regression suite. A separate 347-check Prism run covers fake native lifetime/failures, single-route output and confirmed localized announcements while active, inactive, minimized and hidden, without focus movement. Eight native checks loaded the pinned x64 Prism library and initialized the running NVDA backend without sending speech or cancellation; 12 WPF window-restoration and nine native Explorer tray checks also passed. These sets overlap and do not certify speech actually heard by a person, physical keyboard-triggered cross-application dispatch or microphone effects, which still require user/hardware testing.
 
 Run the console checks with:
 
@@ -147,7 +150,7 @@ These checks use WPF windows, a simulated receiver and an in-memory tray. Actual
 
 ## Third-party notices
 
-Hollylark uses HidSharp and NAudio. Keep their attribution and license texts intact; see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) and the library licenses available in the application's Help window.
+Hollylark uses HidSharp, NAudio and Prism through Prismatoid. Keep their attribution and license texts intact; see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) and the library licenses available in the application's Help window.
 
 ## License
 
