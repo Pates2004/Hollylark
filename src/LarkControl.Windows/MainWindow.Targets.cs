@@ -127,24 +127,32 @@ public partial class MainWindow
             return Task.CompletedTask;
         }
         MicrophoneControlScope scope = MicrophoneControlScope.All(connected);
-        bool muted = !connected.All(index => currentStatus!.Transmitters[index].Muted);
         return RunSessionOperationAsync(Localization.Text("Target.All.Pending"), async (session, _, token) =>
         {
             A1Status status = await session.ReadStatusAsync(token);
+            scope.Validate(status, SettingChange.Mute(connected[0], true));
+            bool muted = !connected.All(index => status.Transmitters[index].Muted);
             foreach (int index in connected)
             {
                 SettingChange change = SettingChange.Mute(index, muted);
                 scope.Validate(status, change);
                 if (status.Transmitters[index].Muted != muted)
-                    status = await session.ApplyAsync(change, token, scope);
+                {
+                    A1Status checkpoint = status;
+                    status = await session.ApplyAsync(change, token, scope, live => connected.All(activeIndex =>
+                        live.Transmitters[activeIndex].Muted == checkpoint.Transmitters[activeIndex].Muted));
+                }
             }
             status = await session.ReadStatusAsync(token);
             scope.Validate(status, SettingChange.Mute(connected[0], muted));
             if (connected.Any(index => status.Transmitters[index].Muted != muted))
                 throw new InvalidDataException("The device did not confirm the requested mute state for all selected microphones.");
             return status;
-        }, Localization.Text(muted ? "Target.All.MutedConfirmed" : "Target.All.UnmutedConfirmed"),
-            failureWarning: Localization.Text("Target.All.PartialFailure"));
+        }, Localization.Text("Main.Hotkey.MuteConfirmed"),
+            failureWarning: Localization.Text("Target.All.PartialFailure"),
+            observeSettings: true,
+            successMessage: status => Localization.Text(connected.All(index => status.Transmitters[index].Muted)
+                ? "Target.All.MutedConfirmed" : "Target.All.UnmutedConfirmed"));
     }
 }
 

@@ -132,6 +132,9 @@ internal static partial class Program
         VerifyAutomatedControlInterface();
         VerifyPrismBackgroundInterfaceChecks();
         VerifyBatteryAlertInterfaceChecks();
+        VerifyRelativeControlChecks();
+        VerifyRetentionOverrideChecks();
+        VerifyHotkeyCompletionChecks();
         if (!skipNativeMenuSmoke) VerifySingleInstanceActivationChecks();
         else Console.WriteLine("SKIP: Window restoration/focus requires the interactive desktop; run --single-instance-ui-only separately.");
         application.Shutdown();

@@ -23,7 +23,10 @@ public interface IDesktopIntegration : IDisposable
 public sealed record TrayTransmitterSnapshot(int Index, bool IsConnected, bool IsMuted, bool CanToggleMute);
 
 public sealed record TrayControlSnapshot(bool CanRefresh, int? ConfirmedGain, bool CanAdjustGain,
-    IReadOnlyList<TrayTransmitterSnapshot> Transmitters);
+    IReadOnlyList<TrayTransmitterSnapshot> Transmitters)
+{
+    public long ContextGeneration { get; init; }
+}
 
 internal enum TrayCommand : uint
 {
@@ -243,11 +246,33 @@ public sealed class DesktopIntegration : IDesktopIntegration
 
     internal IReadOnlyList<TrayMenuEntry> GetTrayMenuEntries() => CreateTrayMenu(readTraySnapshot?.Invoke(), trayControlPending);
 
-    internal async Task<bool> ExecuteTrayControlAsync(TrayCommand command)
+    internal TrayControlSnapshot? CaptureTrayControlSnapshot()
+    {
+        traySource?.Dispatcher.VerifyAccess();
+        TrayControlSnapshot? snapshot = readTraySnapshot?.Invoke();
+        return snapshot is null ? null : snapshot with
+        {
+            Transmitters = Array.AsReadOnly(snapshot.Transmitters.ToArray())
+        };
+    }
+
+    internal async Task<bool> ExecuteTrayControlAsync(TrayCommand command, TrayControlSnapshot? expectedSnapshot = null)
     {
         if (disposed || trayControlPending || readTraySnapshot is null)
             return false;
-        TrayMenuEntry? entry = GetTrayMenuEntries().SingleOrDefault(item => item.Command == command && !item.IsSeparator);
+        traySource?.Dispatcher.VerifyAccess();
+        TrayControlSnapshot snapshot = readTraySnapshot();
+        if (expectedSnapshot is not null && command is (TrayCommand.DecreaseGain or TrayCommand.IncreaseGain
+            or TrayCommand.ToggleMute1 or TrayCommand.ToggleMute2 or TrayCommand.ToggleMute3 or TrayCommand.ToggleMute4))
+        {
+            if (expectedSnapshot.ContextGeneration != snapshot.ContextGeneration)
+                throw new InvalidOperationException(Localization.Text("Desktop.TrayContextChanged"));
+            TrayMenuEntry? expectedEntry = CreateTrayMenu(expectedSnapshot)
+                .SingleOrDefault(item => item.Command == command && !item.IsSeparator);
+            if (expectedEntry is not { Enabled: true })
+                return false;
+        }
+        TrayMenuEntry? entry = CreateTrayMenu(snapshot).SingleOrDefault(item => item.Command == command && !item.IsSeparator);
         if (entry is not { Enabled: true })
             return false;
         Func<Task>? action = command switch
@@ -269,11 +294,11 @@ public sealed class DesktopIntegration : IDesktopIntegration
         finally { trayControlPending = false; }
     }
 
-    private async void InvokeTrayControl(TrayCommand command)
+    private async void InvokeTrayControl(TrayCommand command, TrayControlSnapshot? expectedSnapshot)
     {
         Window? owner = trayOwner;
         Action? restore = showAction;
-        try { await ExecuteTrayControlAsync(command); }
+        try { await ExecuteTrayControlAsync(command, expectedSnapshot); }
         catch (Exception exception)
         {
             if (!disposed)
@@ -552,9 +577,11 @@ public sealed class DesktopIntegration : IDesktopIntegration
             throw NativeError("Desktop.CreateTrayMenuFailed");
         uint selected = 0;
         var errors = new List<Exception>();
+        TrayControlSnapshot? menuSnapshot = null;
         try
         {
-            foreach (TrayMenuEntry entry in GetTrayMenuEntries())
+            menuSnapshot = CaptureTrayControlSnapshot();
+            foreach (TrayMenuEntry entry in CreateTrayMenu(menuSnapshot, trayControlPending))
                 if (!NativeMethods.AppendMenu(menu, entry.NativeFlags, (UIntPtr)(uint)entry.Command, entry.Label))
                     throw NativeError("Desktop.AppendTrayMenuItemFailed");
             if (!NativeMethods.SetMenuDefaultItem(menu, 1, false))
@@ -595,7 +622,7 @@ public sealed class DesktopIntegration : IDesktopIntegration
         if ((TrayCommand)selected is TrayCommand.DecreaseGain or TrayCommand.IncreaseGain
             or TrayCommand.ToggleMute1 or TrayCommand.ToggleMute2 or TrayCommand.ToggleMute3 or TrayCommand.ToggleMute4)
         {
-            InvokeTrayControl((TrayCommand)selected);
+            InvokeTrayControl((TrayCommand)selected, menuSnapshot);
             return;
         }
         if (selected == (uint)TrayCommand.Refresh

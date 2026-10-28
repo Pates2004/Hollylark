@@ -30,11 +30,15 @@ public partial class MainWindow
         return false;
     }
 
-    private void RememberConfirmedSettings(A1Status status)
+    private void RememberConfirmedSettings(A1Status status, IReadOnlyCollection<A1Command>? confirmedCommands = null)
     {
+        if (confirmedCommands is null || confirmedCommands.Count == 0)
+        {
+            ObserveReadOnlySettings(status);
+            return;
+        }
         if (!preferences.PreserveVolatileSettings || sessionReceiver is null || !RetentionStorageAvailable()) return;
-        RetentionRestoreRequest? request = retention.Observe(sessionReceiver.Path, status);
-        if (request is not null) retention.Abandon(request, status);
+        deferredRetention = retention.Confirm(sessionReceiver.Path, status, confirmedCommands);
         RetentionStorageAvailable();
     }
 

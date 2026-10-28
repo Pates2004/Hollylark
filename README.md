@@ -4,11 +4,11 @@
 
 An unofficial Windows application for controlling a **Hollyland LARK A1 USB-C** receiver. Hollylark provides native WPF controls, keyboard navigation and accessible labels for NVDA. It is independent of Hollyland and is not endorsed by the manufacturer.
 
-**Source version 0.11.0** · Windows x64 · .NET Desktop Runtime 10 x64
+**Source version 0.11.1** · Windows x64 · .NET Desktop Runtime 10 x64
 
 ## Download and launch
 
-The latest published portable package is **v0.9.1**. This guide describes the **0.11.0 source**, including battery alerts; [build from source](#build) to use newer features before a matching package is released.
+The latest published portable package is **v0.9.1**. This guide describes the **0.11.1 source**, including battery alerts; [build from source](#build) to use newer features before a matching package is released.
 
 1. Download the portable ZIP from the [latest GitHub release](https://github.com/Pates2004/Hollylark/releases/latest).
 2. Install **Microsoft .NET Desktop Runtime 10 for Windows x64** separately. Hollylark is framework-dependent: it does not bundle .NET. Its native Windows GUI host offers the standard .NET download prompt when the required runtime is missing.
@@ -62,6 +62,8 @@ By default, choosing a value creates a draft; press **Apply** to send it. Automa
 
 Group mute/unmute sends commands sequentially to the active microphone indices, checks acknowledgements and requires a final readback confirming the whole group. A mixed group is muted; a fully muted group is unmuted. This is not an atomic operation: a failure, disconnection or cancellation can leave some microphones changed. A partial-operation warning means you should read the current state again; it does not mean earlier writes were rolled back.
 
+Tray gain steps and microphone mute toggles use a fresh device snapshot, with a second check before writing. An external change to the parameter between those reads cancels the command. Hardware entries in an open tray menu also retain their receiver/microphone context; reopen the menu if that context changes.
+
 ## Battery alerts
 
 Open **Settings → Battery alerts**. The master **Enable battery alerts** switch is enabled by default. Set whole percentage thresholds with **1 ≤ critical < low ≤ 100**; the default thresholds are inclusive: low at **20% or below**, critical at **10% or below**. Invalid thresholds prevent saving. **OK** saves the draft; leaving with unsaved changes lets you save or discard it. Resetting this category restores its defaults.
@@ -94,6 +96,8 @@ Global shortcuts are **disabled by default**. Enabling/disabling keeps the assig
 The existing **Announce device state changes through the screen reader** option sends confirmed changes made through a phone or microphone buttons directly to a running reader through **Prism**, using its .NET binding **Prismatoid**. This does not require an active Hollylark window: it also works while minimized or hidden in the tray. Keep `prism.dll` beside the EXE. NVDA has priority if several supported readers are running; standalone SAPI/OneCore voices are not selected. Direct requests do not interrupt current reader speech, move focus, repeat unchanged values or announce battery fluctuations. A successful direct request suppresses the duplicate UI Automation notification. If no supported reader is available or direct output fails, Hollylark falls back to UI Automation; presentation then depends on reader policy. Readers must share the Windows session and desktop. Automated tests do not certify speech actually heard by a person.
 
 **Preserve volatile microphone settings** is enabled by default. Confirmed gain, channels, noise reduction, EQ, reverb, LEDs, auto-off and supported identification settings are remembered per receiver USB path in `data/retained-settings.json`, beside the EXE. Continuous-session external changes become the new baseline. After a detected disconnection/reconnection, differing shared parameters are restored with fresh group checks, conflict detection and readback. This affects the whole active group, regardless of the displayed individual target. Mute is never restored and microphones are never automatically unmuted. If the first device snapshot already has active microphones, their actual state is adopted without writing an old configuration; if startup first observes them disconnected, remembered settings can be restored when they return. A different USB path gets its own baseline. Power cycles entirely between polls or while Hollylark is closed cannot be identified reliably; the protocol does not report why a value changed. Failures or concurrent changes stop the attempt without repeated write loops. Unavailable noise/identification changes are not forced by unmuting or bypassing microphone-count gates. Unsent drafts or open Settings prevent a new restoration attempt. F5 and explicit identity reads remain read-only; a deferred reconnect restoration can occur on a later background poll. Disable preservation to prevent these automatic writes.
+
+An explicitly confirmed shared parameter takes priority over a deferred reconnect restoration for that parameter. Other remembered parameters remain pending. A successful audio profile confirms its audio fields together; read-only operations, mute changes and refused profiles do not replace the saved shared intent. Shortcut feedback is discarded if a replacement receiver or newer operation has taken ownership before it resumes.
 
 ## Keyboard and NVDA
 
@@ -145,7 +149,7 @@ Build artifacts go to `D:\work\Workspace\<checkout-directory-name>`. Superseded 
 
 ## Validation
 
-Version 0.11.0 passed **42,790 checks** in the full isolated Windows regression suite. Battery coverage includes threshold recovery, independent output choices, settings migration and failure preservation, localized native controls, and active/inactive/minimized/hidden delivery without focus movement. It also checks that read, profile and shortcut completion neither erase a new warning nor bypass its speech preference. Separate native checks loaded the pinned x64 Prism library and initialized the running NVDA backend without speech or cancellation (8), restored owned WPF windows (12), exercised the Explorer tray (9) and verified artifact safety (9). These sets overlap. Actual speech and sound heard by a person, physical keyboard-triggered cross-application dispatch and microphone effects still require user/hardware testing.
+Version 0.11.1 passed **43,925 checks** in the full isolated Windows regression suite. A focused 1,129-check run covers fresh relative controls, stale tray/shortcut contexts, selective restoration and reentrant Prism cleanup using simulated responses. The full suite also covers battery thresholds/channels, settings persistence and native PL/EN keyboard/UIA behavior. Separate checks load and initialize the pinned native Prism/NVDA backend without speech or cancellation (8), exercise the Explorer tray (9) and verify artifact safety (9). Counts overlap. Actual speech and sound heard by a person, physical keyboard-triggered cross-application dispatch and microphone effects still require user/hardware testing. A previously observed missing-or-unnamed status lookup remains unreproduced; release-smoke failures now retain the original lookup and native UIA context for diagnosis.
 
 Run the console checks with:
 

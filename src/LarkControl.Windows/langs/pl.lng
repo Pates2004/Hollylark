@@ -22,6 +22,7 @@
   "Battery.SoundUnavailable": "Nie udało się odtworzyć dźwięku ostrzeżenia o baterii.",
   "Battery.SpeechUnavailable": "Nie udało się ogłosić ostrzeżenia o baterii: {0}",
   "Desktop.AppendTrayMenuItemFailed": "Nie udało się dodać dostępnej pozycji menu zasobnika.",
+  "Desktop.TrayContextChanged": "Odbiornik lub wybór mikrofonów zmienił się. Otwórz menu zasobnika ponownie.",
   "Desktop.CleanupFailed": "Nie udało się zwolnić zasobów integracji Hollylark z pulpitem.",
   "Desktop.CloseActiveTrayMenuFailed": "Nie udało się zamknąć aktywnego menu zasobnika Hollylark.",
   "Desktop.CopyTrayIconFailed": "Nie udało się utworzyć własnej ikony zasobnika Hollylark.",

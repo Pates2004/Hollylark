@@ -233,6 +233,7 @@ public partial class MainWindow
         foreach (SettingRowViewModel setting in AllSettings) setting.DiscardDraft();
         string? restriction = null;
         bool wroteSettings = false;
+        var confirmedProfileCommands = new List<A1Command>();
         SettingChange noiseChange = SettingChange.Noise(profile.NoiseEnabled, profile.NoiseLevel);
         Task pendingApplication = RunSessionOperationAsync(Localization.Text("Main.Profile.Pending", profile.Name),
             async (session, _, token) =>
@@ -281,8 +282,11 @@ public partial class MainWindow
                         wroteSettings = true;
                     }
                 }
+                if (profile.CreateChanges().All(change => change.IsConfirmed(status)))
+                    confirmedProfileCommands.AddRange(profile.CreateChanges().Select(change => change.Command));
                 return status;
-            }, Localization.Text("Main.Profile.StatusRead"));
+            }, Localization.Text("Main.Profile.StatusRead"),
+                confirmedCommands: confirmedProfileCommands);
         long expectedOperation = operation;
         await pendingApplication;
         if (!IsSession(originalSession, expectedGeneration) || operation != expectedOperation)
@@ -363,6 +367,7 @@ public partial class MainWindow
 
     private void RaiseBackgroundNotification(string message, string activity)
     {
+        if (closed) return;
         Window target = UiNotificationRouting.SelectStateTarget(this, OwnedWindows.OfType<AuxiliaryWindow>());
         try
         {

@@ -147,6 +147,37 @@ public sealed class DeviceSettingsRetention
         return null;
     }
 
+    public RetentionRestoreRequest? Confirm(string receiverPath, A1Status status, IReadOnlyCollection<A1Command> confirmedCommands)
+    {
+        ArgumentNullException.ThrowIfNull(confirmedCommands);
+        if (confirmedCommands.Any(command => command is not (A1Command.SetGain or A1Command.SetChannelMode or A1Command.SetNoise
+            or A1Command.SetEqualizer or A1Command.SetReverb or A1Command.SetLight or A1Command.SetAutoOff or A1Command.SetIdentification)))
+            throw new ArgumentException("Only confirmed shared settings can replace retained intent.", nameof(confirmedCommands));
+        Observe(receiverPath, status);
+        ReceiverState receiver = receivers[receiverPath];
+        if (receiver.Pending is not { } pending) return null;
+        if (confirmedCommands.Count == 0) return pending;
+        RetainedSettings actual = RetainedSettings.FromStatus(status);
+        RetainedSettings desired = pending.DesiredSettings;
+        foreach (A1Command command in confirmedCommands)
+            desired = command switch
+            {
+                A1Command.SetGain => desired with { Gain = actual.Gain },
+                A1Command.SetChannelMode => desired with { ChannelMode = actual.ChannelMode },
+                A1Command.SetNoise => desired with { NoiseEnabled = actual.NoiseEnabled, NoiseLevel = actual.NoiseLevel },
+                A1Command.SetEqualizer => desired with { Equalizer = actual.Equalizer },
+                A1Command.SetReverb => desired with { ReverbEnabled = actual.ReverbEnabled, ReverbLevel = actual.ReverbLevel },
+                A1Command.SetLight => desired with { LightsEnabled = actual.LightsEnabled },
+                A1Command.SetAutoOff => desired with { AutoOff = actual.AutoOff },
+                A1Command.SetIdentification => desired with { IdentificationEnabled = actual.IdentificationEnabled },
+                _ => desired
+            };
+        receiver.Pending = desired.CreateChanges(status).Count == 0 ? null
+            : new RetentionRestoreRequest(receiverPath, desired, actual, pending.ConnectedIndices.ToArray());
+        Adopt(receiver, desired);
+        return receiver.Pending;
+    }
+
     public bool IsCurrent(RetentionRestoreRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);

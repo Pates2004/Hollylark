@@ -414,16 +414,51 @@ internal static partial class Program
 
     private static void VerifyOfflineAuthoritativeUpdate(MainWindow window, GuardedSettingSlider slider, SettingRowViewModel gain)
     {
+        var pollTimer = UsbField<System.Windows.Threading.DispatcherTimer>(window, "pollTimer");
+        bool timerWasEnabled = pollTimer.IsEnabled;
+        pollTimer.Stop();
+        try
+        {
+            PumpUntil(() => !UsbField<bool>(window, "polling"));
+            VerifyIsolatedAuthoritativeUpdate(window, slider, gain);
+        }
+        finally { if (timerWasEnabled) pollTimer.Start(); }
+    }
+
+    private static void VerifyIsolatedAuthoritativeUpdate(MainWindow window, GuardedSettingSlider slider, SettingRowViewModel gain)
+    {
         byte[] payload = (byte[])ValidStatus.Clone();
         payload[0] = 0;
         payload[1] = 0;
         payload[8] = (byte)((gain.SelectedIndex + 1) % gain.Options.Count);
-        gain.Update(A1Status.Parse(payload), false);
-        Pump();
-        Check(slider.Value == payload[8] + 1 && !gain.IsDirty, "Confirmed status updates bypass offline edit guards without dirtying the model");
-        var choice = FindById<GuardedSettingComboBox>(window, gain.ChoiceId);
-        Check(choice.SelectedIndex == payload[8] && ((ComboBoxItem)choice.Items[payload[8]]).IsSelected,
-            "Confirmed offline status synchronizes both the combo and its selected container");
+        var trace = new List<string>();
+        string Describe() => $"slider={slider.Value}; model={gain.SelectedIndex}; dirty={gain.IsDirty}; "
+            + $"windowGain={UsbField<A1Status?>(window, "currentStatus")?.Gain}; busy={window.IsBusy}; polling={UsbField<bool>(window, "polling")}";
+        PropertyChangedEventHandler modelChanged = (_, change) => trace.Add(change.PropertyName + ": " + Describe());
+        RoutedPropertyChangedEventHandler<double> sliderChanged = (_, change) => trace.Add($"slider {change.OldValue}->{change.NewValue}: " + Describe());
+        gain.PropertyChanged += modelChanged;
+        slider.ValueChanged += sliderChanged;
+        try
+        {
+            trace.Add("before: " + Describe());
+            gain.Update(A1Status.Parse(payload), false);
+            trace.Add("after model update: " + Describe());
+            Pump();
+            trace.Add("after dispatcher: " + Describe());
+            File.WriteAllLines(Path.Combine(ReportDirectory, "offline-authoritative-" + Localization.CurrentLanguage + ".txt"), trace);
+            Check(slider.Value == payload[8] + 1 && !gain.IsDirty,
+                "Confirmed status updates bypass offline edit guards without dirtying the model; expected=" + (payload[8] + 1) + "; " + Describe());
+            var choice = FindById<GuardedSettingComboBox>(window, gain.ChoiceId);
+            Check(choice.SelectedIndex == payload[8] && ((ComboBoxItem)choice.Items[payload[8]]).IsSelected,
+                "Confirmed offline status synchronizes both the combo and its selected container");
+            RunTask(Poll(window));
+            A1Status live = UsbField<A1Status>(window, "currentStatus");
+            trace.Add("after controlled live poll: " + Describe());
+            File.WriteAllLines(Path.Combine(ReportDirectory, "offline-authoritative-" + Localization.CurrentLanguage + ".txt"), trace);
+            Check(live.Gain != payload[8] && slider.Value == live.Gain + 1 && gain.SelectedIndex == live.Gain && !gain.IsDirty,
+                "A real read-only poll replaces the injected probe with actual device truth; direct-model assertions require poll isolation");
+        }
+        finally { gain.PropertyChanged -= modelChanged; slider.ValueChanged -= sliderChanged; }
     }
 
     private static void VerifyGuardedControlsOnline(MainWindow window, GuardedSettingSlider slider, SettingRowViewModel gain,

@@ -2,6 +2,17 @@
 
 User-visible changes are listed here. Entries describe changes, not a certification of hardware compatibility, NVDA speech or completed release validation.
 
+## [0.11.1] - 2026-10-28
+
+### Fixed
+
+- Calculate tray gain steps and individual/group mute toggles from fresh device status. Check again before each write so a concurrent external change is reported rather than overwritten. Group failures retain the partial-operation warning and confirmed messages describe the actual final state.
+- Bind hardware entries in an open tray menu to the receiver and microphone context used to display them. A changed context requires reopening the menu; an old disabled entry cannot become enabled during dispatch.
+- Give manually confirmed shared parameters priority over a deferred reconnect restoration without discarding other remembered parameters. Successful audio profiles confirm only their audio fields; read-only operations, mute changes and refused profiles preserve the remaining restoration intent.
+- Ignore old shortcut feedback after a replacement receiver or newer operation takes ownership, including the four-slot to two-slot transition. Initial discovery and actual command-failure notifications remain available.
+- Defer Prism context shutdown until an active native call and backend cleanup finish, refuse nested direct speech and suppress UIA fallback after the owner closes. Lifetime checks use simulated callbacks; actual reader COM pumping and audible output are not certified.
+- Retain the original failed UI Automation lookup, selected tabs and native element metadata in release-smoke diagnostics. A previously observed missing-or-unnamed status lookup remains unreproduced rather than being labeled repaired.
+
 ## [0.11.0] - 2026-10-28
 
 ### Added

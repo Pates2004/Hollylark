@@ -22,6 +22,7 @@
   "Battery.SoundUnavailable": "The battery warning sound could not be played.",
   "Battery.SpeechUnavailable": "The battery warning could not be announced: {0}",
   "Desktop.AppendTrayMenuItemFailed": "Adding an accessible tray menu item failed.",
+  "Desktop.TrayContextChanged": "The receiver or microphone selection changed. Open the tray menu again.",
   "Desktop.CleanupFailed": "Cleaning up Hollylark desktop integration failed.",
   "Desktop.CloseActiveTrayMenuFailed": "Closing the active Hollylark tray menu failed.",
   "Desktop.CopyTrayIconFailed": "Creating the owned Hollylark tray icon failed.",

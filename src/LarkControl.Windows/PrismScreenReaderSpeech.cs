@@ -22,6 +22,7 @@ internal sealed class PrismScreenReaderSpeech : IScreenReaderSpeech
     private readonly int ownerThread = Environment.CurrentManagedThreadId;
     private nint context;
     private bool disposed;
+    private bool callActive;
 
     internal PrismScreenReaderSpeech(IPrismSpeechApi? native = null) => this.native = native ?? new PrismSpeechApi();
 
@@ -30,28 +31,45 @@ internal sealed class PrismScreenReaderSpeech : IScreenReaderSpeech
         if (disposed || string.IsNullOrWhiteSpace(message)) return false;
         if (message.Contains('\0')) throw new ArgumentException("Speech cannot contain a null character.", nameof(message));
         VerifyThread();
-        if (context == 0)
+        if (callActive) return false;
+        // Native calls can pump STA callbacks. Keep the context alive until their finally blocks finish.
+        callActive = true;
+        try
         {
-            context = native.Initialize();
-            if (context == 0) throw new InvalidOperationException("Prism initialization failed.");
-        }
-        const PrismBackendFeature required = PrismBackendFeature.IsSupportedAtRuntime | PrismBackendFeature.SupportsSpeak;
-        foreach (PrismBackendId identifier in ReaderIds)
-        {
-            nint backend = native.CreateBackend(context, identifier);
-            if (backend == 0) continue;
-            try
+            if (context == 0)
             {
-                if ((native.GetFeatures(backend) & required) != required) continue;
-                PrismError initialized = native.InitializeBackend(backend);
-                if (initialized == PrismError.PRISM_ERROR_BACKEND_NOT_AVAILABLE) continue;
-                RequireSuccess(initialized, "initialize");
-                RequireSuccess(native.Speak(backend, message, interrupt: false), "speak");
-                return true;
+                context = native.Initialize();
+                if (disposed) return false;
+                if (context == 0) throw new InvalidOperationException("Prism initialization failed.");
             }
-            finally { native.FreeBackend(backend); }
+            const PrismBackendFeature required = PrismBackendFeature.IsSupportedAtRuntime | PrismBackendFeature.SupportsSpeak;
+            foreach (PrismBackendId identifier in ReaderIds)
+            {
+                if (disposed) return false;
+                nint backend = native.CreateBackend(context, identifier);
+                if (backend == 0) continue;
+                try
+                {
+                    if (disposed) return false;
+                    PrismBackendFeature features = native.GetFeatures(backend);
+                    if (disposed) return false;
+                    if ((features & required) != required) continue;
+                    PrismError initialized = native.InitializeBackend(backend);
+                    if (disposed) return false;
+                    if (initialized == PrismError.PRISM_ERROR_BACKEND_NOT_AVAILABLE) continue;
+                    RequireSuccess(initialized, "initialize");
+                    RequireSuccess(native.Speak(backend, message, interrupt: false), "speak");
+                }
+                finally { native.FreeBackend(backend); }
+                return !disposed;
+            }
+            return false;
         }
-        return false;
+        finally
+        {
+            callActive = false;
+            if (disposed) ShutdownContext();
+        }
     }
 
     public void Dispose()
@@ -59,6 +77,11 @@ internal sealed class PrismScreenReaderSpeech : IScreenReaderSpeech
         if (disposed) return;
         VerifyThread();
         disposed = true;
+        if (!callActive) ShutdownContext();
+    }
+
+    private void ShutdownContext()
+    {
         nint previous = context;
         context = 0;
         if (previous != 0) native.Shutdown(previous);

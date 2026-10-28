@@ -93,7 +93,17 @@ public partial class MainWindow
         }
         if (action == HotkeyAction.ReadStatus)
         {
-            await RefreshAsync();
+            A1Controller? readSession = controller;
+            long readGeneration = generation;
+            long initialOperation = operation;
+            bool discoversReceiver = !IsConnected && automaticReceiverManagement;
+            Task pendingRead = RefreshAsync();
+            long readOperation = operation;
+            await pendingRead;
+            // Discovery may establish its own first session, advancing both counters once.
+            bool connectedByRead = discoversReceiver && readSession is null && IsConnected
+                && IsCurrent(readGeneration + 1, initialOperation + 1);
+            if (!OwnsHotkeyCompletion(readSession, readGeneration, readOperation) && !connectedByRead) return;
             HotkeyFeedback(ResultText, resultIsImportant);
             return;
         }
@@ -101,7 +111,12 @@ public partial class MainWindow
         if (action is HotkeyAction.ToggleSelectedMute or HotkeyAction.ToggleAllMute)
         {
             TransmitterViewModel? selected = TransmitterList.SelectedItem as TransmitterViewModel;
-            await ToggleHotkeyMuteAsync(action == HotkeyAction.ToggleAllMute);
+            A1Controller? muteSession = controller;
+            long muteGeneration = generation;
+            Task pendingMute = ToggleHotkeyMuteAsync(action == HotkeyAction.ToggleAllMute);
+            long muteOperation = operation;
+            await pendingMute;
+            if (!OwnsHotkeyCompletion(muteSession, muteGeneration, muteOperation)) return;
             string message = ResultText;
             if (!resultIsImportant && currentStatus is not null)
             {
@@ -115,18 +130,24 @@ public partial class MainWindow
             return;
         }
         if (!TryGetSharedControlScope(out MicrophoneControlScope? scope)) { HotkeyFeedback(ResultText, true); return; }
-        string id = action switch
+        (string id, A1Command command) = action switch
         {
-            HotkeyAction.IncreaseGain or HotkeyAction.DecreaseGain => "Gain",
-            HotkeyAction.CycleNoise => "Noise", HotkeyAction.CycleEqualizer => "Equalizer",
-            HotkeyAction.CycleReverb => "Reverb", HotkeyAction.CycleLights => "Lights",
-            HotkeyAction.CycleAutoOff => "AutoOff", HotkeyAction.CycleIdentification => "Identification",
-            HotkeyAction.CycleChannelMode => "ChannelMode", _ => throw new ArgumentOutOfRangeException(nameof(action))
+            HotkeyAction.IncreaseGain or HotkeyAction.DecreaseGain => ("Gain", A1Command.SetGain),
+            HotkeyAction.CycleNoise => ("Noise", A1Command.SetNoise),
+            HotkeyAction.CycleEqualizer => ("Equalizer", A1Command.SetEqualizer),
+            HotkeyAction.CycleReverb => ("Reverb", A1Command.SetReverb),
+            HotkeyAction.CycleLights => ("Lights", A1Command.SetLight),
+            HotkeyAction.CycleAutoOff => ("AutoOff", A1Command.SetAutoOff),
+            HotkeyAction.CycleIdentification => ("Identification", A1Command.SetIdentification),
+            HotkeyAction.CycleChannelMode => ("ChannelMode", A1Command.SetChannelMode),
+            _ => throw new ArgumentOutOfRangeException(nameof(action))
         };
         SettingRowViewModel row = AllSettings.Single(setting => setting.Id == id);
         if (!RequestSettingEdit(row)) { HotkeyFeedback(ResultText, true); return; }
         bool fourTransmitters = A1DeviceIdentity.IsFourTransmitterFirmware(versions.GetValueOrDefault(0));
-        await RunSessionOperationAsync(Localization.Text("Main.Apply.Pending", row.DisplayName), async (session, _, token) =>
+        A1Controller? settingSession = controller;
+        long settingGeneration = generation;
+        Task pendingSetting = RunSessionOperationAsync(Localization.Text("Main.Apply.Pending", row.DisplayName), async (session, _, token) =>
         {
             A1Status status = await session.ReadStatusAsync(token);
             SettingChange change = HotkeyChange(action, status);
@@ -135,9 +156,18 @@ public partial class MainWindow
             return change.IsConfirmed(status) ? status : await session.ApplyAsync(change, token, scope,
                 live => CanRestoreParameter(change.Command, live, fourTransmitters)
                     && RetainedSettings.FromStatus(live) == RetainedSettings.FromStatus(status));
-        }, Localization.Text("Main.Apply.Success", row.DisplayName));
+        }, Localization.Text("Main.Apply.Success", row.DisplayName), confirmedCommands: [command]);
+        long settingOperation = operation;
+        await pendingSetting;
+        if (!OwnsHotkeyCompletion(settingSession, settingGeneration, settingOperation)) return;
         HotkeyFeedback(resultIsImportant ? ResultText : Localization.Text("Setting.Value", row.DisplayName, row.ConfirmedValue), resultIsImportant);
     }
+
+    // An owned failure closes its session once; its error still needs background feedback.
+    private bool OwnsHotkeyCompletion(A1Controller? expectedSession, long expectedGeneration, long expectedOperation) =>
+        IsCurrent(expectedGeneration, expectedOperation) && ReferenceEquals(controller, expectedSession)
+        || expectedSession is not null && controller is null && resultIsImportant
+            && IsCurrent(expectedGeneration + 1, expectedOperation + 1);
 
     private Task ToggleHotkeyMuteAsync(bool all)
     {
@@ -177,7 +207,8 @@ public partial class MainWindow
             if (indices.Any(index => status.Transmitters[index].Muted != muted))
                 throw new InvalidOperationException("Final microphone mute readback differs from the requested state.");
             return status;
-        }, Localization.Text("Main.Hotkey.MuteConfirmed"), failureWarning: Localization.Text("Target.All.PartialFailure"));
+        }, Localization.Text("Main.Hotkey.MuteConfirmed"), failureWarning: Localization.Text("Target.All.PartialFailure"),
+            observeSettings: true);
     }
 
     private static SettingChange HotkeyChange(HotkeyAction action, A1Status status) => action switch

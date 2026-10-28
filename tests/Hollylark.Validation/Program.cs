@@ -26,6 +26,32 @@ internal static partial class Program
                 && arguments[0] == "--observe-arrow-automation")
                 return ObserveArrowAutomation(arguments[1], arguments.Length == 3);
             LarkControl.Windows.Localization.Initialize();
+            if (arguments.Contains("--bug-review-only") || arguments.Contains("--relative-controls-only"))
+            {
+                if (!arguments.Contains("--relative-controls-only"))
+                {
+                    VerifyTrayContextChecks();
+                    VerifyPrismReentrancyChecks();
+                }
+                var application = new System.Windows.Application
+                {
+                    ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown,
+                    ThemeMode = System.Windows.ThemeMode.Light
+                };
+                SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+                try
+                {
+                    VerifyRelativeControlChecks();
+                    if (!arguments.Contains("--relative-controls-only"))
+                    {
+                        VerifyRetentionOverrideChecks();
+                        VerifyHotkeyCompletionChecks();
+                    }
+                }
+                finally { application.Shutdown(); }
+                Console.WriteLine($"PASS: {passed} bug review checks. Simulated receivers, native APIs and outputs only; no physical device writes, speech, audio or global input.");
+                return 0;
+            }
             if (arguments.Contains("--battery-alerts-only") || arguments.Contains("--battery-core-only"))
             {
                 VerifyBatteryAlertChecks();
@@ -54,6 +80,7 @@ internal static partial class Program
             if (arguments.Contains("--prism-only"))
             {
                 VerifyPrismSpeechChecks();
+                VerifyPrismReentrancyChecks();
                 var application = new System.Windows.Application
                 {
                     ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown,
@@ -307,11 +334,13 @@ internal static partial class Program
             }
             VerifySingleInstanceChecks();
             VerifyLocalizationCore();
+            VerifyTrayContextChecks();
             VerifyBatteryAlertChecks();
             VerifyBatteryAlertPreferencesChecks();
             VerifyBatteryNotificationInfrastructure();
             VerifyArrowFocusMetadataGuards();
             VerifyPrismSpeechChecks();
+            VerifyPrismReentrancyChecks();
             VerifyHotkeyChecks();
             VerifyDeviceSettingsRetentionChecks();
             VerifyAutomationPreferences();

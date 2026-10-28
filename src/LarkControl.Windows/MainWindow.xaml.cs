@@ -299,7 +299,7 @@ public partial class MainWindow : Window
         return RunSessionOperationAsync(Localization.Text("Main.Apply.Pending", setting.DisplayName),
             (session, _, token) => session.ApplyAsync(change, token, scope),
             Localization.Text("Main.Apply.Success", setting.DisplayName),
-            () => setting.AcceptDraft(revision));
+            () => setting.AcceptDraft(revision), confirmedCommands: [change.Command]);
     }
 
     public Task ToggleMuteAsync(int transmitterIndex)
@@ -315,16 +315,25 @@ public partial class MainWindow : Window
                 : Localization.Text("Main.Mute.ConnectSelected", transmitterIndex + 1), true);
             return Task.CompletedTask;
         }
-        bool muted = !currentStatus!.Transmitters[transmitterIndex].Muted;
-        SettingChange change = SettingChange.Mute(transmitterIndex, muted);
+        MicrophoneControlScope scope = MicrophoneControlScope.Individual(transmitterIndex);
         return RunSessionOperationAsync(Localization.Text("Main.Mute.Pending", transmitterIndex + 1),
-            (session, _, token) => session.ApplyAsync(change, token, MicrophoneControlScope.Individual(transmitterIndex)),
-            Localization.Text(muted ? "Main.Mute.Confirmed" : "Main.Mute.Unmuted", transmitterIndex + 1));
+            async (session, _, token) =>
+            {
+                A1Status status = await session.ReadStatusAsync(token);
+                scope.Validate(status, SettingChange.Mute(transmitterIndex, true));
+                bool muted = !status.Transmitters[transmitterIndex].Muted;
+                return await session.ApplyAsync(SettingChange.Mute(transmitterIndex, muted), token, scope,
+                    live => live.Transmitters[transmitterIndex].Muted == status.Transmitters[transmitterIndex].Muted);
+            }, Localization.Text("Main.Hotkey.MuteConfirmed"),
+            observeSettings: true,
+            successMessage: status => Localization.Text(status.Transmitters[transmitterIndex].Muted
+                ? "Main.Mute.Confirmed" : "Main.Mute.Unmuted", transmitterIndex + 1));
     }
 
     private async Task RunSessionOperationAsync(string pending,
         Func<A1Controller, long, CancellationToken, Task<A1Status>> action, string success, Action? confirmed = null,
-        string? failureWarning = null, bool observeSettings = false)
+        string? failureWarning = null, bool observeSettings = false, Func<A1Status, string>? successMessage = null,
+        IReadOnlyCollection<A1Command>? confirmedCommands = null)
     {
         if (closed || busy || controller is null || currentStatus is null || sessionCancellation is null) return;
         var previousFocus = CaptureOperationFocus();
@@ -348,10 +357,11 @@ public partial class MainWindow : Window
             }
             else
             {
-                ShowState(state);
+                ShowState(state, confirmedCommands: confirmedCommands);
             }
+            string confirmedResult = successMessage?.Invoke(state) ?? success;
             string result = retention.LastError is not null && preferences.PreserveVolatileSettings
-                ? success + " " + Localization.Text("Retention.StoreError", retentionStore.FilePath) : success;
+                ? confirmedResult + " " + Localization.Text("Retention.StoreError", retentionStore.FilePath) : confirmedResult;
             bool retentionError = retention.LastError is not null && preferences.PreserveVolatileSettings;
             if (retentionError || batteryAlertRevision == initialBatteryRevision) SetResult(result, retentionError);
             else Log(result);
@@ -361,7 +371,8 @@ public partial class MainWindow : Window
             if (IsSession(session, expectedGeneration) && operation == expectedOperation)
             {
                 DiscardControlTargetDrafts();
-                ShowState(exception.Status);
+                ObserveReadOnlySettings(exception.Status);
+                ShowState(exception.Status, rememberSettings: false);
                 SetResult(ScopeFailureMessage(exception) + (failureWarning is null ? string.Empty : " " + failureWarning), true);
             }
         }
@@ -370,8 +381,9 @@ public partial class MainWindow : Window
             if (IsSession(session, expectedGeneration) && operation == expectedOperation)
             {
                 DiscardControlTargetDrafts();
-                ShowState(exception.Status);
-                SetResult(Localization.Text("Main.Change.Concurrent"), true);
+                ObserveReadOnlySettings(exception.Status);
+                ShowState(exception.Status, rememberSettings: false);
+                SetResult(Localization.Text("Main.Change.Concurrent") + (failureWarning is null ? string.Empty : " " + failureWarning), true);
             }
         }
         catch (DeviceWriteSafetyException exception)
@@ -381,7 +393,8 @@ public partial class MainWindow : Window
                 pendingAutomaticChanges.Clear();
                 autoApplyTimer.Stop();
                 foreach (SettingRowViewModel setting in AllSettings) setting.DiscardDraft();
-                ShowState(exception.Status);
+                ObserveReadOnlySettings(exception.Status);
+                ShowState(exception.Status, rememberSettings: false);
                 SetResult(DeviceWriteSafetyMessage(exception) + (failureWarning is null ? string.Empty : " " + failureWarning), true);
             }
         }
@@ -505,11 +518,11 @@ public partial class MainWindow : Window
         if (!repeated) SetResult(Localization.Text("Main.Session.Closed", message), true);
     }
 
-    private void ShowState(A1Status state, bool rememberSettings = true)
+    private void ShowState(A1Status state, bool rememberSettings = true, IReadOnlyCollection<A1Command>? confirmedCommands = null)
     {
         A1Status? previous = currentStatus;
         currentStatus = state;
-        if (rememberSettings) RememberConfirmedSettings(state);
+        if (rememberSettings) RememberConfirmedSettings(state, confirmedCommands);
         lastConfirmedRead = DateTimeOffset.Now;
         foreach (int device in versions.Keys.Where(device => device > 0 &&
             (device > state.Transmitters.Count || !state.Transmitters[device - 1].Connected)).ToArray())
@@ -563,7 +576,8 @@ public partial class MainWindow : Window
     private TrayControlSnapshot ReadTraySnapshot() => new(IsConnected && !busy && !closed,
         currentStatus?.Gain, !closed && AudioSettings.First(setting => setting.Id == "Gain").IsEnabled,
         Transmitters.Select(transmitter => new TrayTransmitterSnapshot(transmitter.Index,
-            transmitter.IsConnected, transmitter.IsMuted, !closed && transmitter.CanMute)).ToArray());
+            transmitter.IsConnected, transmitter.IsMuted, !closed && transmitter.CanMute)).ToArray())
+        { ContextGeneration = controlContextGeneration };
 
     private Task AdjustGainFromTrayAsync(int direction)
     {
@@ -571,10 +585,17 @@ public partial class MainWindow : Window
         SettingRowViewModel gain = AudioSettings.First(setting => setting.Id == "Gain");
         if (currentStatus is null || !gain.IsEnabled || closed) return Task.CompletedTask;
         RestoreFromTray();
-        int selected = Math.Clamp(currentStatus.Gain + direction, 0, 5);
-        if (selected == currentStatus.Gain) return Task.CompletedTask;
-        gain.SelectedIndex = selected;
-        return ApplySettingAsync(gain);
+        if (!TryGetSharedControlScope(out MicrophoneControlScope? scope)) return Task.CompletedTask;
+        pendingAutomaticChanges.Remove(gain);
+        gain.DiscardDraft();
+        return RunSessionOperationAsync(Localization.Text("Main.Apply.Pending", gain.DisplayName), async (session, _, token) =>
+        {
+            A1Status status = await session.ReadStatusAsync(token);
+            SettingChange change = SettingChange.Gain(Math.Clamp(status.Gain + direction, 0, 5));
+            scope!.Validate(status, change);
+            return change.IsConfirmed(status) ? status : await session.ApplyAsync(change, token, scope,
+                live => live.Gain == status.Gain);
+        }, Localization.Text("Main.Apply.Success", gain.DisplayName), confirmedCommands: [A1Command.SetGain]);
     }
 
     private Task ToggleMuteFromTrayAsync(int index)

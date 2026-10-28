@@ -8,7 +8,7 @@
     <AssemblyName>Hollylark</AssemblyName>
     <Product>Hollylark</Product>
     <Title>Hollylark</Title>
-    <Version>0.11.0</Version>
+    <Version>0.11.1</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugType>embedded</DebugType>
   </PropertyGroup>

@@ -217,7 +217,39 @@ function Get-ReleaseElement {
     param([Windows.Automation.AutomationElement]$Root, [string]$Identifier)
     $element = $Root.FindFirst([Windows.Automation.TreeScope]::Descendants,
         [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty, $Identifier))
-    if ($null -eq $element -or [string]::IsNullOrWhiteSpace($element.Current.Name)) {
+    $name = if ($null -ne $element) { $element.Current.Name } else { $null }
+    if ($null -eq $element -or [string]::IsNullOrWhiteSpace($name)) {
+        $failure = [ordered]@{
+            RequestedIdentifier = $Identifier
+            FirstMatchMissing = $null -eq $element
+            FirstMatchName = $name
+            RootProcessId = $Root.Current.ProcessId
+            RootIdentifier = $Root.Current.AutomationId
+            Elements = @()
+        }
+        try {
+            $elements = $Root.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)
+            $failure.Elements = @($elements | ForEach-Object {
+                $current = $_.Current
+                if ($current.AutomationId -or $current.ControlType -eq [Windows.Automation.ControlType]::TabItem) {
+                    $selection = $null
+                    $selected = if ($_.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) {
+                        $selection.Current.IsSelected
+                    } else { $null }
+                    [ordered]@{
+                        Identifier = $current.AutomationId; Name = $current.Name; Class = $current.ClassName
+                        Framework = $current.FrameworkId; Type = $current.ControlType.ProgrammaticName
+                        Selected = $selected; Offscreen = $current.IsOffscreen; RuntimeId = $_.GetRuntimeId()
+                    }
+                }
+            })
+        }
+        catch { $failure.CaptureError = $_.ToString() }
+        try {
+            $failure | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -LiteralPath (
+                Join-Path $reportDirectory ('uia-missing-control-' + [guid]::NewGuid().ToString('N') + '.json'))
+        }
+        catch { Write-Warning ('Could not retain UI Automation failure details: ' + $_.ToString()) }
         throw "Published control is missing or unnamed: $Identifier"
     }
     return $element

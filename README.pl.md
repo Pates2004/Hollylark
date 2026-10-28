@@ -4,11 +4,11 @@
 
 Nieoficjalna aplikacja Windows do sterowania odbiornikiem **Hollyland LARK A1 USB-C**. Hollylark zapewnia natywne kontrolki WPF, obsługę klawiatury i dostępne etykiety dla NVDA. Jest projektem niezależnym od Hollyland i nie ma poparcia producenta.
 
-**Wersja źródeł 0.11.0** · Windows x64 · .NET Desktop Runtime 10 x64
+**Wersja źródeł 0.11.1** · Windows x64 · .NET Desktop Runtime 10 x64
 
 ## Pobieranie i uruchamianie
 
-Najnowsza opublikowana paczka portable to **v0.9.1**. Ten przewodnik opisuje **źródła 0.11.0**, w tym ostrzeżenia o baterii; aby korzystać z nowszych funkcji przed publikacją odpowiedniej paczki, [zbuduj program ze źródeł](#kompilacja).
+Najnowsza opublikowana paczka portable to **v0.9.1**. Ten przewodnik opisuje **źródła 0.11.1**, w tym ostrzeżenia o baterii; aby korzystać z nowszych funkcji przed publikacją odpowiedniej paczki, [zbuduj program ze źródeł](#kompilacja).
 
 1. Pobierz wersję portable w ZIP z [najnowszego wydania na GitHubie](https://github.com/Pates2004/Hollylark/releases/latest).
 2. Osobno zainstaluj **Microsoft .NET Desktop Runtime 10 dla Windows x64**. Hollylark jest aplikacją framework-dependent: nie zawiera środowiska .NET. Natywny host GUI Windows wyświetla standardową propozycję pobrania .NET, gdy brakuje wymaganego środowiska.
@@ -62,6 +62,8 @@ Domyślnie wybór wartości tworzy szkic; dopiero **Zastosuj** wysyła zmianę. 
 
 Grupowe wyciszanie/włączanie dźwięku wysyła polecenia kolejno do indeksów aktywnych mikrofonów, sprawdza potwierdzenia i wymaga końcowego odczytu potwierdzającego stan całej grupy. Grupa mieszana zostaje wyciszona; w grupie całkowicie wyciszonej dźwięk zostaje włączony. Operacja nie jest atomowa: błąd, rozłączenie lub anulowanie mogą pozostawić część mikrofonów ze zmienionym stanem. Ostrzeżenie o częściowym wykonaniu oznacza konieczność ponownego odczytu stanu; nie oznacza cofnięcia wcześniejszych zapisów.
 
+Zmiany wzmocnienia z zasobnika oraz przełączanie wyciszenia korzystają ze świeżego odczytu i ponownej kontroli przed wysłaniem polecenia. Zewnętrzna zmiana danego parametru między tymi odczytami przerywa polecenie. Pozycje sprzętowe otwartego menu zasobnika zachowują też kontekst odbiornika i mikrofonów; po jego zmianie otwórz menu ponownie.
+
 ## Ostrzeżenia o baterii
 
 Otwórz **Ustawienia → Ostrzeżenia o baterii**. Główny przełącznik **Włącz ostrzeżenia o baterii** jest domyślnie włączony. Ustaw całkowite progi procentowe zgodne z **1 ≤ krytyczny < niski ≤ 100**; domyślne progi uwzględniają równość: poziom niski to **20% lub mniej**, a krytyczny **10% lub mniej**. Nieprawidłowe progi blokują zapis. **OK** zapisuje szkic; opuszczenie okna z niezapisanymi zmianami pozwala je zapisać lub odrzucić. Przywrócenie tej kategorii odtwarza ustawienia domyślne.
@@ -94,6 +96,8 @@ Globalne skróty są **domyślnie wyłączone**. Ich wyłączanie nie usuwa przy
 Istniejąca opcja **Ogłaszaj zmiany stanu urządzenia za pomocą czytnika ekranu** przekazuje potwierdzone zmiany z telefonu i przycisków mikrofonu bezpośrednio uruchomionemu czytnikowi przez **Prism**, za pomocą bindingu .NET **Prismatoid**. Nie wymaga aktywnego okna Hollylarka: działa również po zminimalizowaniu lub ukryciu w zasobniku. Plik `prism.dll` musi pozostać obok EXE. Jeśli działa kilka obsługiwanych czytników, pierwszeństwo ma NVDA; osobne głosy SAPI/OneCore nie są wybierane. Bezpośrednie komunikaty nie żądają przerwania bieżącej mowy czytnika, nie przenoszą fokusu, nie powtarzają niezmienionych wartości ani wahań baterii. Udane bezpośrednie przekazanie wyklucza dodatkowe wysłanie tego samego powiadomienia UI Automation. Jeśli czytnik jest niedostępny lub przekazanie zawiedzie, pozostaje UI Automation; wtedy odczyt zależy od polityki czytnika. Czytnik musi działać w tej samej sesji Windows i na tym samym pulpicie. Testy automatyczne nie potwierdzają mowy rzeczywiście usłyszanej przez człowieka.
 
 **Zachowuj niestałe ustawienia mikrofonów** jest domyślnie włączone. Potwierdzone wzmocnienie, kanały, redukcja szumu, EQ, pogłos, diody, automatyczne wyłączenie i obsługiwane rozpoznawanie są pamiętane osobno dla ścieżki USB odbiornika w `data/retained-settings.json` obok EXE. Zmiany zewnętrzne podczas ciągłego połączenia stają się nową zapamiętaną konfiguracją. Po wykrytym rozłączeniu i powrocie program przywraca różniące się wspólne parametry ze świeżą kontrolą grupy, konfliktów i odczytu. Dotyczy to całej aktywnej grupy, niezależnie od aktualnie pokazanego pojedynczego mikrofonu. Wyciszenie nie jest przywracane i program nigdy sam nie odcisza mikrofonów. Jeśli pierwszy odczyt sprzętu zastanie aktywne mikrofony, przyjmuje ich rzeczywisty stan bez wysyłania starej konfiguracji; jeśli najpierw zastanie je rozłączone, zapamiętane ustawienia mogą wrócić po ich połączeniu. Inna ścieżka USB ma własną konfigurację. Cyklu całkowicie pomiędzy odczytami lub przy zamkniętym Hollylarku nie da się wiarygodnie rozpoznać; protokół nie podaje przyczyny zmiany wartości. Błąd lub zmiana podczas przywracania kończy próbę bez pętli. Program nie odcisza mikrofonów ani nie omija wymaganej liczby TX, aby wymusić niedostępną zmianę redukcji szumu lub rozpoznawania. Niezastosowane wybory albo otwarte Ustawienia blokują rozpoczęcie przywracania. F5 i odczyt identyfikatorów pozostają tylko odczytem; odroczone przywrócenie może nastąpić przy późniejszym odczycie w tle. Wyłącz zachowywanie, aby zapobiec takim automatycznym zapisom.
+
+Ręcznie potwierdzony parametr wspólny ma pierwszeństwo przed odłożonym przywracaniem tego parametru po ponownym połączeniu. Pozostałe zapamiętane parametry nadal czekają na przywrócenie. Pomyślnie zastosowany profil potwierdza swoje pola audio; odczyty, zmiany wyciszenia i odmowy zastosowania profilu nie zastępują zapamiętanych wartości wspólnych. Opóźniony wynik skrótu jest pomijany, jeśli wcześniej zmienił się odbiornik albo rozpoczęła się nowsza operacja.
 
 ## Klawiatura i NVDA
 
@@ -145,7 +149,7 @@ Artefakty kompilacji trafiają do `D:\work\Workspace\<nazwa-katalogu-źródeł>`
 
 ## Walidacja
 
-Wersja 0.11.0 przeszła **42 790 kontroli** pełnej regresji na osobnym pulpicie Windows. Sprawdzono progi i ponawianie ostrzeżeń, niezależne kanały, migrację i ochronę ustawień przy błędach, natywne etykiety PL/EN oraz działanie przy aktywnym, nieaktywnym, zminimalizowanym i ukrytym oknie bez zmiany fokusu. Odczyt, profil i skrót nie kasują nowego ostrzeżenia ani nie obchodzą jego ustawienia mowy. Osobne kontrole obejmują załadowanie ustalonej biblioteki x64 i inicjalizację backendu NVDA bez wysyłania mowy ani anulowania (8), przywracanie własnych okien WPF (12), zasobnik Explorer (9) oraz bezpieczeństwo artefaktów (9). Zakresy częściowo się pokrywają. Mowa i dźwięk usłyszane przez człowieka, fizyczne wywoływanie skrótów z innej aplikacji oraz skutki na mikrofonach nadal wymagają prób użytkownika/sprzętu.
+Wersja 0.11.1 przeszła **43 925 kontroli** pełnej regresji na osobnym pulpicie Windows. Osobne 1129 sprawdzeń obejmuje świeże odczyty dla poleceń względnych, nieaktualne konteksty menu i skrótów, selektywne przywracanie oraz sprzątanie Prism przy zagnieżdżonych wywołaniach na symulowanych odpowiedziach. Pełny zestaw sprawdza też progi i kanały baterii, zapis ustawień oraz natywną obsługę klawiatury i UIA po polsku i angielsku. Osobne kontrole obejmują załadowanie i inicjalizację natywnego backendu Prism/NVDA bez mowy ani anulowania (8), zasobnik Explorer (9) i bezpieczeństwo artefaktów (9). Zakresy częściowo się pokrywają. Odsłuch, fizyczne wywoływanie skrótów z innej aplikacji i skutki na mikrofonach nadal wymagają prób użytkownika/sprzętu. Wcześniejszego braku lub pustej nazwy pola statusu nie udało się powtórzyć; błędy testu wydania zapisują teraz pierwotny wynik wyszukiwania i kontekst natywnego UIA.
 
 Kontrole konsolowe uruchomisz poleceniami:
 
