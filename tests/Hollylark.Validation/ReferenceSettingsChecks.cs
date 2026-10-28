@@ -21,9 +21,11 @@ internal static partial class Program
             ["SettingsThemeChoice"] = ["Jasny", "Ciemny"],
             ["SettingsTextScaleChoice"] = ["100%", "125%", "150%", "175%", "200%"],
             ["GainControlModeChoice"] = ["Lista wyboru", "Przyciski", "Suwak"],
-            ["ValueDisplayModeChoice"] = ["Pola tylko do odczytu", "Zwykły tekst", "Bez dodatkowych wartości"]
+            ["ValueDisplayModeChoice"] = ["Pola tylko do odczytu", "Zwykły tekst", "Bez dodatkowych wartości"],
+            ["BatteryLowThresholdChoice"] = Enumerable.Range(2, 99).Select(value => value + "%").ToArray(),
+            ["BatteryCriticalThresholdChoice"] = Enumerable.Range(1, 99).Select(value => value + "%").ToArray()
         };
-        string[] categoryNames = ["Wygląd", "Ekran główny", "Sterowanie", "Uruchamianie i zamykanie", "Profile audio", "Skróty klawiszowe"];
+        string[] categoryNames = ["Wygląd", "Ekran główny", "Sterowanie", "Uruchamianie i zamykanie", "Profile audio", "Skróty klawiszowe", "Ostrzeżenia o baterii"];
         foreach (string theme in new[] { "Light", "Dark" })
         foreach (int scale in new[] { 100, 200 })
         {
@@ -48,7 +50,7 @@ internal static partial class Program
                 window.Show();
                 Pump();
                 var tabs = (TabControl)window.FindName("SettingsTabs");
-                Check(tabs.Items.Count == categoryNames.Length, "Reference settings retain existing categories and append keyboard shortcuts");
+                Check(tabs.Items.Count == categoryNames.Length, "Reference settings retain existing categories and append keyboard shortcuts and battery alerts");
                 VerifyReferenceSettingsGeometry(window);
                 for (int categoryIndex = 0; categoryIndex < tabs.Items.Count; categoryIndex++)
                 {

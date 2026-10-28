@@ -64,7 +64,8 @@ public partial class MainWindow : Window
     public MainWindow(Func<IReadOnlyList<ReceiverInfo>> discover, Func<ReceiverInfo, IA1Transport> factory,
         string? baseDirectory = null, IDesktopIntegration? desktop = null, Func<string, string, bool>? confirm = null,
         Action<string>? announceState = null, Action<string>? reportDesktopError = null, bool automaticReceiverManagement = true,
-        IHotkeyNativeApi? hotkeyNativeApi = null, IScreenReaderSpeech? screenReader = null)
+        IHotkeyNativeApi? hotkeyNativeApi = null, IScreenReaderSpeech? screenReader = null,
+        Action<BatteryAlertSeverity>? playBatterySound = null)
     {
         ArgumentNullException.ThrowIfNull(discover);
         ArgumentNullException.ThrowIfNull(factory);
@@ -73,6 +74,7 @@ public partial class MainWindow : Window
         this.automaticReceiverManagement = automaticReceiverManagement;
         this.hotkeyNativeApi = hotkeyNativeApi;
         this.screenReader = screenReader;
+        this.playBatterySound = playBatterySound ?? PlayBatterySystemSound;
         desktopIntegration = desktop ?? new DesktopIntegration();
         if (desktopIntegration is DesktopIntegration nativeDesktop) nativeDesktop.Failed += OnDesktopFailure;
         Func<string, string, bool> confirmDialog = confirm ?? ((message, title) => MessageBox.Show(GetDialogOwner(), message, title,
@@ -209,6 +211,7 @@ public partial class MainWindow : Window
         busy = true;
         UpdateView();
         if (reportProgress) SetResult(Localization.Text("Main.Usb.Reading", receiver.Name));
+        long initialBatteryRevision = batteryAlertRevision;
         try
         {
             IA1Transport transport;
@@ -230,7 +233,8 @@ public partial class MainWindow : Window
             bool attemptedRestoration = await AcceptObservedStateAsync(state, session, expectedGeneration, token);
             if (!IsSession(session, expectedGeneration) || operation != expectedOperation) return;
             pollTimer.Start();
-            if (!attemptedRestoration && retention.LastError is null) SetResult(GetUsbConnectionText());
+            if (!attemptedRestoration && retention.LastError is null && batteryAlertRevision == initialBatteryRevision)
+                SetResult(GetUsbConnectionText());
             else if (retention.LastError is not null) SetResult(Localization.Text("Retention.StoreError", retentionStore.FilePath), true);
         }
         catch (Exception exception)
@@ -331,6 +335,7 @@ public partial class MainWindow : Window
         busy = true;
         UpdateView();
         SetResult(pending);
+        long initialBatteryRevision = batteryAlertRevision;
         try
         {
             A1Status state = await action(session, expectedGeneration, token);
@@ -345,9 +350,11 @@ public partial class MainWindow : Window
             {
                 ShowState(state);
             }
-            SetResult(retention.LastError is not null && preferences.PreserveVolatileSettings
-                ? success + " " + Localization.Text("Retention.StoreError", retentionStore.FilePath) : success,
-                retention.LastError is not null && preferences.PreserveVolatileSettings);
+            string result = retention.LastError is not null && preferences.PreserveVolatileSettings
+                ? success + " " + Localization.Text("Retention.StoreError", retentionStore.FilePath) : success;
+            bool retentionError = retention.LastError is not null && preferences.PreserveVolatileSettings;
+            if (retentionError || batteryAlertRevision == initialBatteryRevision) SetResult(result, retentionError);
+            else Log(result);
         }
         catch (MicrophoneScopeException exception)
         {
@@ -512,6 +519,7 @@ public partial class MainWindow : Window
             identities.Remove(device);
         UpdateView();
         if (!busy) AnnounceConfirmedChanges(previous, state);
+        ObserveBatteryLevels(state);
     }
 
     private void UpdateView()
@@ -634,9 +642,12 @@ public partial class MainWindow : Window
             return state;
         }, Localization.Text("Main.Identity.Success"), observeSettings: true);
 
-    private void SetResult(string message, bool important = false, bool announce = true)
+    private void SetResult(string message, bool important = false, bool announce = true, bool batteryWarning = false)
     {
         if (closed) return;
+        AutomationProperties.SetLiveSetting(ResultReadout, AutomationLiveSetting.Off);
+        resultCanAnnounce = announce;
+        resultIsBatteryWarning = batteryWarning;
         UiSupport.UpdateReadout(ResultReadout, message);
         AutomationProperties.SetName(ResultReadout, Localization.Text("Main.Result.AccessibleName", message));
         resultIsImportant = important;

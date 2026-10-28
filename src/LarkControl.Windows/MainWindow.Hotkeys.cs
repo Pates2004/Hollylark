@@ -208,6 +208,7 @@ public partial class MainWindow
 
     private void HotkeyFeedback(string message, bool important)
     {
+        if (resultIsBatteryWarning && ResultText == message) return;
         if (ResultText != message || resultIsImportant != important) SetResult(message, important);
         bool announcedInActiveWindow = (important || preferences.ShowOperationMessages)
             && UiNotificationRouting.SelectTarget(this, OwnedWindows.OfType<AuxiliaryWindow>()) is not null;

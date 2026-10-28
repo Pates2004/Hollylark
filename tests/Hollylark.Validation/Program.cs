@@ -26,6 +26,25 @@ internal static partial class Program
                 && arguments[0] == "--observe-arrow-automation")
                 return ObserveArrowAutomation(arguments[1], arguments.Length == 3);
             LarkControl.Windows.Localization.Initialize();
+            if (arguments.Contains("--battery-alerts-only") || arguments.Contains("--battery-core-only"))
+            {
+                VerifyBatteryAlertChecks();
+                VerifyBatteryAlertPreferencesChecks();
+                VerifyBatteryNotificationInfrastructure();
+                if (!arguments.Contains("--battery-core-only"))
+                {
+                    var application = new System.Windows.Application
+                    {
+                        ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown,
+                        ThemeMode = System.Windows.ThemeMode.Light
+                    };
+                    SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+                    try { VerifyBatteryAlertInterfaceChecks(); }
+                    finally { application.Shutdown(); }
+                }
+                Console.WriteLine($"PASS: {passed} battery alert checks. Simulated receivers, speech, sounds and notifications only; no physical writes or global input.");
+                return 0;
+            }
             if (arguments.Length is 1 or 2 && arguments[0] == "--native-prism-only")
             {
                 VerifyNativePrismChecks(arguments.Length == 2 ? arguments[1] : null);
@@ -288,6 +307,9 @@ internal static partial class Program
             }
             VerifySingleInstanceChecks();
             VerifyLocalizationCore();
+            VerifyBatteryAlertChecks();
+            VerifyBatteryAlertPreferencesChecks();
+            VerifyBatteryNotificationInfrastructure();
             VerifyArrowFocusMetadataGuards();
             VerifyPrismSpeechChecks();
             VerifyHotkeyChecks();

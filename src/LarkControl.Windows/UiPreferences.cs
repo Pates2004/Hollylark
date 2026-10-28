@@ -13,7 +13,7 @@ public enum ValueDisplayMode { ReadOnlyFields, StaticText, None }
 
 public sealed record UiPreferences
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
     public const int MaximumProfiles = 32;
     public static IReadOnlyList<string> SupportedRowIds { get; } = Array.AsReadOnly<string>(
         ["Microphones", "Gain", "Noise", "Equalizer", "Reverb", "ChannelMode", "Lights", "AutoOff", "Identification", "TX1", "TX2", "TX3", "TX4"]);
@@ -30,6 +30,7 @@ public sealed record UiPreferences
     public bool ShowHints { get; init; } = true;
     public bool ShowOperationMessages { get; init; } = true;
     public bool AnnounceStateChanges { get; init; } = true;
+    public BatteryAlertPreferences BatteryAlerts { get; init; } = new();
     public bool PreserveVolatileSettings { get; init; } = true;
     public bool GlobalHotkeysEnabled { get; init; }
     public HotkeyBinding[] Hotkeys { get; init; } = HotkeyBinding.CreateDefaults();
@@ -62,6 +63,8 @@ public sealed record UiPreferences
         if (AudioProfiles is null || AudioProfiles.Length > MaximumProfiles)
             throw new ArgumentException("Unsupported audio profile collection.", nameof(AudioProfiles));
         HotkeyBinding.ValidateBindings(Hotkeys);
+        ArgumentNullException.ThrowIfNull(BatteryAlerts);
+        BatteryAlerts.Validate();
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (AudioProfile? profile in AudioProfiles)
         {
@@ -114,7 +117,7 @@ public sealed class UiPreferencesStore
             int version = 1;
             if (root.TryGetProperty(nameof(UiPreferences.SchemaVersion), out JsonElement schema)
                 && (schema.ValueKind != JsonValueKind.Number || !schema.TryGetInt32(out version)
-                    || version is not (1 or 2 or 3 or UiPreferences.CurrentSchemaVersion)))
+                    || version is not (1 or 2 or 3 or 4 or UiPreferences.CurrentSchemaVersion)))
                 throw new JsonException("Unsupported preferences version.");
             if (version == 1 && root.EnumerateObject().Any(property =>
                 property.Name is not (nameof(UiPreferences.SchemaVersion) or nameof(UiPreferences.ShowHints))))

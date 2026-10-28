@@ -383,8 +383,8 @@ internal static partial class Program
             "The optional settings category heading follows the hints preference");
         TabItem appearance = tabs.Items.OfType<TabItem>().Single(tab =>
             AutomationProperties.GetAutomationId(tab) == "AppearanceSettingsTab");
-        Check(tabs.Items.Count == 6 && ReferenceEquals(tabs.SelectedItem, appearance),
-            "Settings open on Appearance with six available categories");
+        Check(tabs.Items.Count == 7 && ReferenceEquals(tabs.SelectedItem, appearance),
+            "Settings open on Appearance with seven available categories including battery alerts");
         CheckKeyboardFocus(FindById<ComboBox>(window, "SettingsLanguageChoice"), "Settings initially focus the first available selector, like the reference");
         TabItem controls = SelectSettingsControlsTab(window);
         CheckBox hints = FindById<CheckBox>(window, "ShowHintsCheckBox");

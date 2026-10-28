@@ -22,6 +22,8 @@ public partial class MainWindow
     private readonly DispatcherTimer autoApplyTimer;
     private readonly HashSet<SettingRowViewModel> pendingAutomaticChanges = [];
     private bool resultIsImportant;
+    private bool resultCanAnnounce = true;
+    private bool resultIsBatteryWarning;
     private bool exitRequested;
     private WindowState stateBeforeTray = WindowState.Normal;
     private IInputElement? focusBeforeTray;
@@ -57,7 +59,7 @@ public partial class MainWindow
         bool visible = !string.IsNullOrWhiteSpace(ResultReadout.Text) && (resultIsImportant || preferences.ShowOperationMessages);
         ResultReadout.Visibility = ResultLabel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         AutomationProperties.SetLiveSetting(ResultReadout,
-            visible ? AutomationLiveSetting.Polite : AutomationLiveSetting.Off);
+            visible && resultCanAnnounce ? AutomationLiveSetting.Polite : AutomationLiveSetting.Off);
     }
 
     internal void AnnounceOperationResult(string message, bool important)
@@ -90,10 +92,12 @@ public partial class MainWindow
             }
             if (candidate.CloseToTray && !preferences.CloseToTray)
             {
-                stagedTray = true;
+                stagedTray = !batteryNotificationTray;
                 EnsureTray();
             }
-            if (!candidate.CloseToTray && preferences.CloseToTray)
+            if (!candidate.CloseToTray && (preferences.CloseToTray || batteryNotificationTray
+                && (!candidate.BatteryAlerts.Policy.Enabled
+                    || !candidate.BatteryAlerts.Low.Notification && !candidate.BatteryAlerts.Critical.Notification)))
             {
                 removedTray = true;
                 desktopIntegration.HideTray();
@@ -106,7 +110,10 @@ public partial class MainWindow
                 autoApplyTimer.Stop();
             }
             bool retentionChanged = candidate.PreserveVolatileSettings != preferences.PreserveVolatileSettings;
+            bool batteryPolicyChanged = candidate.BatteryAlerts.Policy != preferences.BatteryAlerts.Policy;
             preferences = candidate;
+            if (batteryPolicyChanged) batteryMonitor.Reset();
+            if (candidate.CloseToTray || removedTray) batteryNotificationTray = false;
             hotkeyConfigurationValid = true;
             if (retentionChanged)
             {
@@ -219,6 +226,7 @@ public partial class MainWindow
         try { profile.Validate(); }
         catch (Exception exception) { return Localization.Text("Main.Profile.Invalid", exception.Message); }
         A1Controller originalSession = controller!;
+        long initialBatteryRevision = batteryAlertRevision;
         long expectedGeneration = generation;
         pendingAutomaticChanges.Clear();
         autoApplyTimer.Stop();
@@ -286,7 +294,9 @@ public partial class MainWindow
         }
         if (IsConnected && currentStatus is not null && profile.CreateChanges().All(change => change.IsConfirmed(currentStatus)))
         {
-            SetResult(Localization.Text("Main.Profile.Confirmed", profile.Name));
+            string message = Localization.Text("Main.Profile.Confirmed", profile.Name);
+            if (batteryAlertRevision == initialBatteryRevision) SetResult(message);
+            else Log(message);
             return null;
         }
         string error = Localization.Text("Main.Profile.NotConfirmed");
@@ -378,7 +388,7 @@ public partial class MainWindow
             desktopError(Localization.Text("Main.Tray.CleanupFailed", exception.Message));
             return;
         }
-        RestoreFromTray();
+        if (!batteryNotificationTray || preferences.CloseToTray) RestoreFromTray();
         Log(exception.ToString());
         SetResult(Localization.Text("Main.Tray.IntegrationFailed", exception.Message), true);
     }

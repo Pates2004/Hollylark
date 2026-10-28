@@ -238,6 +238,7 @@ internal sealed partial class SettingsWindow : AuxiliaryWindow
         BuildStartupAndClosing();
         BuildProfiles();
         BuildHotkeys();
+        BuildBatteryAlerts();
 
         Body.Children.Add(tabs);
         CloseButton.Visibility = Visibility.Collapsed;
@@ -605,6 +606,7 @@ internal sealed partial class SettingsWindow : AuxiliaryWindow
                 PreserveVolatileSettings = defaults.PreserveVolatileSettings
             },
             "Hotkeys" => draft with { GlobalHotkeysEnabled = defaults.GlobalHotkeysEnabled, Hotkeys = HotkeyBinding.CreateDefaults() },
+            "BatteryAlerts" => draft with { BatteryAlerts = defaults.BatteryAlerts },
             "StartupAndClosing" => draft with
             {
                 StartWithWindows = defaults.StartWithWindows, CloseToTray = defaults.CloseToTray, ConfirmExit = defaults.ConfirmExit
@@ -743,6 +745,7 @@ internal sealed partial class SettingsWindow : AuxiliaryWindow
     {
         if (applyingProfile || committing || confirming || accepted) return false;
         if (!ValidateHotkeyDraft()) return false;
+        if (!ValidateBatteryAlertDraft()) return false;
         if (!string.IsNullOrWhiteSpace(profileName.Text))
         {
             tabs.SelectedItem = FindName("ProfilesSettingsTab");

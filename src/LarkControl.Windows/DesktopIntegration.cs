@@ -16,6 +16,7 @@ public interface IDesktopIntegration : IDisposable
     void ShowTray(Window owner, Action show, Action settings, Action refresh, Action exit);
     void ConfigureTrayControls(Func<TrayControlSnapshot> readSnapshot, Func<int, Task> adjustGain,
         Func<int, Task> toggleMute) { }
+    bool ShowNotification(string title, string message, bool critical) => false;
     void HideTray();
 }
 
@@ -331,6 +332,56 @@ public sealed class DesktopIntegration : IDesktopIntegration
         }
     }
 
+    public bool ShowNotification(string title, string message, bool critical)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        trayOwner?.Dispatcher.VerifyAccess();
+        HwndSource? source = traySource;
+        if (!iconAdded || source is null || trayOwner is null)
+            return false;
+        source.Dispatcher.VerifyAccess();
+        if (source.IsDisposed || source.Dispatcher.HasShutdownStarted || source.Dispatcher.HasShutdownFinished)
+            return false;
+        if (CreateNotificationData(source.Handle, title, message, critical) is not { } data)
+            return false;
+        return NativeMethods.ShellNotifyIcon(IconOperation.Modify, ref data);
+    }
+
+    private static NativeMethods.NotifyIconData? CreateNotificationData(IntPtr window, string title, string message, bool critical)
+    {
+        if (window == IntPtr.Zero || !IsNotificationTextValid(title, 63) || !IsNotificationTextValid(message, 255))
+            return null;
+        return new NativeMethods.NotifyIconData
+        {
+            Size = (uint)Marshal.SizeOf<NativeMethods.NotifyIconData>(),
+            Window = window,
+            Id = TrayIconId,
+            Flags = 0x10 | 0x40,
+            Tip = string.Empty,
+            Info = message,
+            InfoTitle = title,
+            InfoFlags = (critical ? 0x3u : 0x2u) | 0x10u
+        };
+    }
+
+    private static bool IsNotificationTextValid(string? text, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Length > maxLength)
+            return false;
+        for (int index = 0; index < text.Length; index++)
+        {
+            char character = text[index];
+            if (character == '\0')
+                return false;
+            if (!char.IsSurrogate(character))
+                continue;
+            if (!char.IsHighSurrogate(character) || index + 1 >= text.Length || !char.IsLowSurrogate(text[index + 1]))
+                return false;
+            index++;
+        }
+        return true;
+    }
+
     public void HideTray()
     {
         if (disposed)
@@ -384,7 +435,7 @@ public sealed class DesktopIntegration : IDesktopIntegration
         if (message == taskbarCreatedMessage && taskbarCreatedMessage != 0)
         {
             iconAdded = false;
-            QueueTrayOperation(RecoverTrayIcon);
+            QueueTrayOperation(RecoverTrayIcon, restoreOnFailure: false);
         }
         else if (message == TrayCallbackMessage && ((longParameter.ToInt64() >> 16) & 0xffff) == TrayIconId)
         {
@@ -405,13 +456,13 @@ public sealed class DesktopIntegration : IDesktopIntegration
     internal static bool IsRestoreNotification(int notification) => notification
         is IconSelectNotification or IconKeyboardSelectNotification or DoubleClickMessage;
 
-    private void QueueTrayOperation(Action operation)
+    private void QueueTrayOperation(Action operation, bool restoreOnFailure = true)
     {
         HwndSource? source = traySource;
         if (source is null || disposed)
             return;
         Window? owner = trayOwner;
-        Action? restore = showAction;
+        Action? restore = restoreOnFailure ? showAction : null;
         Action<Exception> fallback = exception => ShowTrayFailure(owner, exception);
         ExecuteTrayOperation(() => source.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
         {
@@ -606,6 +657,7 @@ public sealed class DesktopIntegration : IDesktopIntegration
     private enum IconOperation : uint
     {
         Add = 0,
+        Modify = 1,
         Delete = 2,
         SetFocus = 3,
         SetVersion = 4

@@ -211,7 +211,7 @@ internal static partial class Program
                 "Enabling automatic selection does not introduce explanatory readouts: " + language);
             var categories = (TabControl)window.FindName("SettingsTabs");
             Check(categories.Items.Cast<TabItem>().Select(tab => tab.Name).SequenceEqual(new[]
-                { "AppearanceSettingsTab", "MainScreenSettingsTab", "ControlsSettingsTab", "StartupAndClosingSettingsTab", "ProfilesSettingsTab", "HotkeysSettingsTab" }),
+                { "AppearanceSettingsTab", "MainScreenSettingsTab", "ControlsSettingsTab", "StartupAndClosingSettingsTab", "ProfilesSettingsTab", "HotkeysSettingsTab", "BatteryAlertsSettingsTab" }),
                 "Startup and closing form one category with no separate legacy tabs: " + language);
             SelectSettingsCategory(window, "StartupAndClosingSettingsTab");
             var startupAndClosing = (TabItem)window.FindName("StartupAndClosingSettingsTab");

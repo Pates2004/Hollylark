@@ -48,6 +48,7 @@ public partial class MainWindow
             && SameReceiver(deferred.ReceiverPath, sessionReceiver.Path) && retention.IsCurrent(deferred)) request = deferred;
         deferredRetention = null;
         bool hadDrafts = AllSettings.Any(setting => setting.IsDirty);
+        long initialBatteryRevision = batteryAlertRevision;
         ShowState(status, rememberSettings: false);
         if (request is null) { RetentionStorageAvailable(); return false; }
         if (hadDrafts || settingsWindow is not null || !RetentionStorageAvailable()
@@ -59,7 +60,7 @@ public partial class MainWindow
         bool wasBusy = busy;
         busy = true;
         UpdateView();
-        SetResult(Localization.Text("Retention.Restoring"));
+        if (batteryAlertRevision == initialBatteryRevision) SetResult(Localization.Text("Retention.Restoring"));
         int[] indices = request.ConnectedIndices.ToArray();
         MicrophoneControlScope scope = indices.Length == 1
             ? MicrophoneControlScope.Individual(indices[0]) : MicrophoneControlScope.All(indices);
@@ -107,7 +108,8 @@ public partial class MainWindow
                 UpdateView();
                 string message = Localization.Text(restored ? "Retention.Restored" : "Retention.Interrupted");
                 bool announce = !restored || preferences.AnnounceStateChanges;
-                SetResult(message, !restored, announce: !announce);
+                if (!restored || batteryAlertRevision == initialBatteryRevision) SetResult(message, !restored, announce: !announce);
+                else Log(message);
                 if (announce)
                     AnnounceBackgroundNotification(message, "Hollylark.Retention");
                 RetentionStorageAvailable();

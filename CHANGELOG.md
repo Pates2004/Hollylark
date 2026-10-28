@@ -2,6 +2,21 @@
 
 User-visible changes are listed here. Entries describe changes, not a certification of hardware compatibility, NVDA speech or completed release validation.
 
+## [0.11.0] - 2026-10-28
+
+### Added
+
+- Native **Battery alerts** settings with a master switch enabled by default, inclusive low/critical thresholds (20%/10% by default), and independent output choices per level. Whole thresholds must satisfy `1 ≤ critical < low ≤ 100`. Reset, save/cancel and settings schema 5 migration preserve the existing preferences workflow.
+- Default battery warnings through the existing Prism background speech route, independent of general device-state announcements and without requiring an active window. Optional Windows tray balloons and system sounds are off by default. Warnings always appear in the main status and log; the status update itself does not request speech.
+- Same-read warnings combined into one popup and one speech request at most, critical first, with each severity's output choices respected. One optional sound uses the highest severity with sound enabled: Windows Exclamation for low or Hand for critical, following the system sound scheme. Windows notification suppression applies; NVDA may independently read optional Windows popups, so disabling Hollylark speech does not control OS/reader policy or prevent duplicate speech when both are enabled.
+- Separate warning episodes for each receiver USB path and microphone 1–4. Initial known low readings warn; an initial critical reading emits only critical. Repeated warnings wait for recovery at least five percentage points above each threshold, capped at 100%. Unknown/disconnected readings are ignored; a connected reported 0% is accepted without certifying a truly empty battery. Brief reconnections and receiver switches retain memory during the run; no warning history is saved to disk. Threshold/master changes reset detection, while output-only changes do not replay warnings.
+- Notification tray icon reuse and lifetime until exit or disabling the master switch or both visual channels; closing to the tray can retain the icon. Complete Polish/English labels, messages, help and guides.
+
+### Limitations
+
+- Warnings perform no microphone actions. Immediate remote power-off has not been verified; the existing 15-minute unpaired auto-off policy is unrelated. No charging-case battery or charging telemetry is added.
+- Audible speech, sound and physical device behavior are not certified by these changes. The latest published GitHub portable package remains **v0.9.1**; this entry describes source version 0.11.0, not a new binary release.
+
 ## [0.10.1] - 2026-10-27
 
 ### Fixed

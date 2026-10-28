@@ -4,11 +4,11 @@
 
 Nieoficjalna aplikacja Windows do sterowania odbiornikiem **Hollyland LARK A1 USB-C**. Hollylark zapewnia natywne kontrolki WPF, obsługę klawiatury i dostępne etykiety dla NVDA. Jest projektem niezależnym od Hollyland i nie ma poparcia producenta.
 
-**Wersja źródeł 0.10.1** · Windows x64 · .NET Desktop Runtime 10 x64
+**Wersja źródeł 0.11.0** · Windows x64 · .NET Desktop Runtime 10 x64
 
 ## Pobieranie i uruchamianie
 
-Najnowsza opublikowana paczka portable to **v0.9.1**. Ten przewodnik opisuje **źródła 0.10.1**; aby korzystać ze skrótów globalnych, zachowywania niestałych ustawień i bezpośrednich ogłoszeń Prism przed publikacją odpowiedniej paczki, [zbuduj program ze źródeł](#kompilacja).
+Najnowsza opublikowana paczka portable to **v0.9.1**. Ten przewodnik opisuje **źródła 0.11.0**, w tym ostrzeżenia o baterii; aby korzystać z nowszych funkcji przed publikacją odpowiedniej paczki, [zbuduj program ze źródeł](#kompilacja).
 
 1. Pobierz wersję portable w ZIP z [najnowszego wydania na GitHubie](https://github.com/Pates2004/Hollylark/releases/latest).
 2. Osobno zainstaluj **Microsoft .NET Desktop Runtime 10 dla Windows x64**. Hollylark jest aplikacją framework-dependent: nie zawiera środowiska .NET. Natywny host GUI Windows wyświetla standardową propozycję pobrania .NET, gdy brakuje wymaganego środowiska.
@@ -33,6 +33,7 @@ Hollylark pozwala na jedną działającą instancję dla użytkownika/sesji Wind
 ## Funkcje
 
 - Automatyczne wykrywanie odbiorników USB, odczyty stanu i wersji firmware oraz poziomów baterii połączonych nadajników.
+- Konfigurowalne ostrzeżenia o niskim i krytycznym poziomie baterii z osobnym wyborem mowy czytnika, powiadomienia Windows i dźwięku systemowego.
 - Edytowalne globalne skróty z przechwytywaniem, włączaniem/wyłączaniem i przywracaniem domyślnych.
 - Opcjonalne powiadomienia czytnika ekranu w tle o potwierdzonych zmianach zewnętrznych.
 - Domyślnie włączone zachowywanie niestałych wspólnych parametrów po zaobserwowanym powrocie mikrofonów.
@@ -60,6 +61,29 @@ W znanym protokole wzmocnienie, redukcja szumu, EQ, pogłos i inne parametry urz
 Domyślnie wybór wartości tworzy szkic; dopiero **Zastosuj** wysyła zmianę. Automatyczne stosowanie jest opcjonalnym ustawieniem, domyślnie wyłączonym. Zmiany wymagają potwierdzenia polecenia i zgodnego odczytu z urządzenia. Zmiana odbiornika, wybranego mikrofonu/grupy lub składu aktywnych mikrofonów odrzuca niewysłane szkice i oczekujące zmiany automatyczne. **F5** również odrzuca szkice przed ponownym odczytem.
 
 Grupowe wyciszanie/włączanie dźwięku wysyła polecenia kolejno do indeksów aktywnych mikrofonów, sprawdza potwierdzenia i wymaga końcowego odczytu potwierdzającego stan całej grupy. Grupa mieszana zostaje wyciszona; w grupie całkowicie wyciszonej dźwięk zostaje włączony. Operacja nie jest atomowa: błąd, rozłączenie lub anulowanie mogą pozostawić część mikrofonów ze zmienionym stanem. Ostrzeżenie o częściowym wykonaniu oznacza konieczność ponownego odczytu stanu; nie oznacza cofnięcia wcześniejszych zapisów.
+
+## Ostrzeżenia o baterii
+
+Otwórz **Ustawienia → Ostrzeżenia o baterii**. Główny przełącznik **Włącz ostrzeżenia o baterii** jest domyślnie włączony. Ustaw całkowite progi procentowe zgodne z **1 ≤ krytyczny < niski ≤ 100**; domyślne progi uwzględniają równość: poziom niski to **20% lub mniej**, a krytyczny **10% lub mniej**. Nieprawidłowe progi blokują zapis. **OK** zapisuje szkic; opuszczenie okna z niezapisanymi zmianami pozwala je zapisać lub odrzucić. Przywrócenie tej kategorii odtwarza ustawienia domyślne.
+
+Każdy poziom ma osobne kanały ostrzegania:
+
+| Ustawienie | Niski poziom baterii | Krytyczny poziom baterii |
+| --- | --- | --- |
+| Próg | 20% | 10% |
+| Powiadomienie Windows | Wyłączone | Wyłączone |
+| Mowa czytnika ekranu przez Prism | Włączona | Włączona |
+| Dźwięk systemowy | Wyłączony | Wyłączony |
+
+Każde wykryte ostrzeżenie pojawia się w głównym polu stanu i logu diagnostycznym niezależnie od wyboru kanałów. Sama aktualizacja stanu nie żąda mowy czytnika. Pole powiadomienia steruje tylko opcjonalnym natywnym dymkiem Windows w zasobniku; nadal obowiązują systemowe zasady blokowania powiadomień. Pole mowy steruje własnymi żądaniami Hollylarka przez istniejącą ścieżkę Prism w tle, niezależnie od opcji **Ogłaszaj zmiany stanu urządzenia za pomocą czytnika ekranu**. Działa przy aktywnym innym programie oraz zminimalizowanym lub ukrytym Hollylarku, bez przenoszenia fokusu. NVDA może niezależnie odczytywać powiadomienia Windows zgodnie z własnymi i systemowymi ustawieniami: wyłączenie mowy Hollylarka tego nie blokuje. Włączenie powiadomienia i mowy może więc spowodować dwukrotne odczytanie ostrzeżenia.
+
+Ostrzeżenia wykryte w jednym odczycie stanu są łączone w najwyżej **jedno powiadomienie Windows i jedno żądanie mowy**, najpierw krytyczne. Każdy poziom trafia tylko do włączonych dla niego kanałów. Odtwarzany jest najwyżej **jeden dźwięk systemowy**, dla najwyższego poziomu z włączonym dźwiękiem: Windows **Exclamation** dla niskiego lub **Hand** dla krytycznego. Obowiązuje schemat dźwięków Windows, który może być cichy. Sam dymek nie żąda dodatkowego dźwięku.
+
+Wykrywanie korzysta z **procentu zgłoszonego** dla każdego połączonego mikrofonu 1–4, także ze zgłoszonego 0%; 0% nie potwierdza rzeczywistego całkowitego rozładowania. Odczyty nieznane i rozłączone mikrofony są pomijane. Pierwszy znany niski odczyt ostrzega od razu; pierwszy krytyczny generuje tylko ostrzeżenie krytyczne. Każdy mikrofon ostrzega raz dla danego progu, aż odczyt osiągnie **co najmniej pięć punktów procentowych powyżej tego progu, maksymalnie 100%**. Przy domyślnych wartościach ostrzeżenie krytyczne może ponowić się po osiągnięciu 15%, a niskie po 25%. Pamięć jest osobna dla ścieżki USB odbiornika i mikrofonu; krótkie rozłączenia i zmiany odbiornika zachowują ją podczas bieżącego uruchomienia. Historia ostrzeżeń nie trafia na dysk. Zmiana progów lub głównego przełącznika zeruje wykrywanie; sama zmiana kanałów nie odtwarza ostrzeżeń ponownie.
+
+Powiadomienia wykorzystują istniejącą ikonę zasobnika. Ikona utworzona dla nich pozostaje do zakończenia programu albo wyłączenia głównego przełącznika lub powiadomień Windows obu poziomów. Pozostaje, jeśli włączono zamykanie do zasobnika; program nie tworzy drugiej ikony.
+
+Ostrzeżenia nie wykonują działań na mikrofonach: nie wyciszają ani nie wyłączają nadajników. **Natychmiastowe zdalne wyłączenie nie zostało zweryfikowane.** Istniejące automatyczne wyłączenie po 15 minutach bez sparowania jest osobną funkcją urządzenia, niezwiązaną z ostrzeżeniami o baterii. Bateria etui i stan ładowania nie są dostępne. Dokumentacja i kontrole automatyczne nie potwierdzają mowy ani dźwięku usłyszanego przez człowieka, rzeczywistej pojemności baterii ani fizycznych skutków na urządzeniach.
 
 ## Globalne skróty i automatyczne przywracanie
 
@@ -92,6 +116,8 @@ Odczyty mają dostępne nazwy i prezentację umożliwiającą ustawienie fokusu.
 
 Preferencje i profile dźwięku są zapisywane w `data/settings.json`, a domyślne raporty diagnostyczne w `reports`, zawsze obok **rzeczywistego EXE**, niezależnie od katalogu roboczego terminala. Hollylark nie przechodzi po cichu do AppData. Używaj zapisywalnego folderu portable. Nieprawidłowe lub nieobsługiwane ustawienia powodują błąd zamiast cichego zastąpienia. Program nie wysyła telemetrii.
 
+Schemat ustawień 5 dodaje preferencje ostrzeżeń o baterii. Starsze obsługiwane ustawienia są migrowane z powyższymi domyślnymi wartościami i zachowaniem istniejących wyborów; odczyt nie nadpisuje pliku. Dopiero jawny zapis utrwala migrację. Pamięć ostrzeżeń o baterii pozostaje wyłącznie w pamięci programu.
+
 Przed aktualizacją całkowicie zakończ Hollylark. Zachowaj folder `data` i potrzebne raporty, a pliki programu oraz oba katalogi językowe zastąp razem zawartością nowego ZIP. Jeśli uruchamianie z Windows jest włączone, wyłącz je przed przeniesieniem folderu portable i włącz ponownie z nowego miejsca.
 
 Diagnostyka może zawierać ścieżki urządzeń USB, wersje firmware, numery seryjne, adresy MAC i surowe raporty. Przejrzyj ją przed publicznym udostępnieniem.
@@ -119,7 +145,7 @@ Artefakty kompilacji trafiają do `D:\work\Workspace\<nazwa-katalogu-źródeł>`
 
 ## Walidacja
 
-Wersja 0.10.1 przeszła 36 374 kontroli pełnej regresji na osobnym pulpicie Windows. Osobny przebieg 347 kontroli Prism obejmuje symulowane błędy i czas życia zasobów natywnych, pojedynczą ścieżkę ogłaszania oraz potwierdzone komunikaty PL/EN przy aktywnym, nieaktywnym, zminimalizowanym i ukrytym oknie bez przenoszenia fokusu. Osiem prób natywnych załadowało ustaloną bibliotekę x64 i zainicjalizowało działający backend NVDA bez wysyłania mowy ani anulowania; przeszło również 12 kontroli przywracania okien WPF i dziewięć prób natywnego zasobnika Explorer. Zakresy częściowo się pokrywają i nie potwierdzają mowy usłyszanej przez człowieka, fizycznego wywoływania skrótów z innej aplikacji ani skutków ustawień na mikrofonach — te próby wymagają użytkownika/sprzętu.
+Wersja 0.11.0 przeszła **42 790 kontroli** pełnej regresji na osobnym pulpicie Windows. Sprawdzono progi i ponawianie ostrzeżeń, niezależne kanały, migrację i ochronę ustawień przy błędach, natywne etykiety PL/EN oraz działanie przy aktywnym, nieaktywnym, zminimalizowanym i ukrytym oknie bez zmiany fokusu. Odczyt, profil i skrót nie kasują nowego ostrzeżenia ani nie obchodzą jego ustawienia mowy. Osobne kontrole obejmują załadowanie ustalonej biblioteki x64 i inicjalizację backendu NVDA bez wysyłania mowy ani anulowania (8), przywracanie własnych okien WPF (12), zasobnik Explorer (9) oraz bezpieczeństwo artefaktów (9). Zakresy częściowo się pokrywają. Mowa i dźwięk usłyszane przez człowieka, fizyczne wywoływanie skrótów z innej aplikacji oraz skutki na mikrofonach nadal wymagają prób użytkownika/sprzętu.
 
 Kontrole konsolowe uruchomisz poleceniami:
 

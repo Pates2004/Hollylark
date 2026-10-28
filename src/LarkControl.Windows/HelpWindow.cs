@@ -34,6 +34,7 @@ internal sealed class HelpWindow : AuxiliaryWindow
             Localization.Text("Help.Guide.Cancellation"),
             Localization.Text("Help.Guide.SafetyGates"),
             Localization.Text("Help.Guide.Battery"),
+            Localization.Text("Help.Guide.BatteryAlerts"),
             Localization.Text("Help.Guide.Firmware"),
             Localization.Text("Help.Guide.AudioMeter"),
             Localization.Text("Help.Guide.Settings"),
